@@ -1,0 +1,77 @@
+
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background: black;
+            position: sticky;
+            top: 0;
+        }
+        nav {
+            display: flex;
+            gap: 1rem;
+            justify-content: center
+        }
+        nav ul {
+            display: flex;
+        }
+        nav ul li {
+            list-style: none;
+        }
+        main {
+            display: flex;
+            flex: 1;
+            padding: 1rem;
+        }
+        section {
+            align-items: center;
+            display: flex;
+            flex: 1;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        section h1 {
+            color: gray;
+            text-align: center;
+        }
+        figure {
+            border: 1px dashed gray;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            height: 512px;
+            margin: 1rem;
+            padding: 1rem;
+            width: 360px;
+        }
+        figure canvas {
+            flex: 1;
+            max-height: 100%;
+            max-width: 100%;
+            min-height: 0;
+            object-fit: contain;
+            cursor: grab;
+            touch-action: none;
+        }
+        figure canvas:active {
+            cursor: grabbing;
+        }
+        figure menu {
+            display: flex;
+            justify-content: center;
+        }
+        figure fieldset {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        figure fieldset section {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .drop-hover {
+            border: 0.5rem dashed gray;
+        }
