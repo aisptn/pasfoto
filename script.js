@@ -647,10 +647,13 @@ section.addEventListener('change', (event) => {
         }
     }
 });
-function getMoveStep(figure) {
+function getMoveStep(figure, direction) {
     const img = figure._sourceImage;
     if (!img || !img.width || !img.height) return 15;
-    return Math.max(8, Math.round(Math.min(img.width, img.height) * 0.02));
+    const step = direction === 'left' || direction === 'right'
+        ? img.width * 0.01
+        : img.height * 0.01;
+    return Math.max(1, Math.round(step));
 }
 function indexToAlphaSuffix(index) {
     let suffix = '';
@@ -673,10 +676,11 @@ section.addEventListener('click', (event) => {
         if (state.scale <= 1) {
             return;
         }
-        const moveStep = getMoveStep(figure);
+        const direction = event.target.className;
+        const moveStep = getMoveStep(figure, direction);
         if (pack === 'p2') {
             const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
-            switch (event.target.className) {
+            switch (direction) {
                 case 'left': local.translateX -= moveStep; break;
                 case 'right': local.translateX += moveStep; break;
                 case 'up': local.translateY -= moveStep; break;
@@ -694,12 +698,11 @@ section.addEventListener('click', (event) => {
             }
         }
     } else if (event.target.name === 'zoom') {
-        const zoomStep = 0.1;
         const oldScale = state.scale;
         if (event.target.className === 'zoom-in') {
-            state.scale = Math.min(3, state.scale * (1 + zoomStep));
+            state.scale = Math.min(3, state.scale * 1.1);
         } else if (event.target.className === 'zoom-out') {
-            state.scale = Math.max(1, state.scale * (1 - zoomStep));
+            state.scale = Math.max(1, state.scale / 1.1);
         }
         const scaleRatio = state.scale / oldScale;
         if (pack === 'p2') {
