@@ -1,10 +1,10 @@
+const section = document.querySelector('section');
+const description = section.querySelector('h1');
 const openButton = document.getElementById('open');
 const saveButton = document.getElementById('save');
 const clearButton = document.getElementById('clear');
 const formatButton = document.getElementById('format');
 const qualityButton = document.getElementById('quality');
-const section = document.querySelector('section');
-const description = section.querySelector('h1');
 
 const readFormats = ['image/avif', 'image/bmp', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
 const writeFormats = ['jpeg', 'png', 'webp'];
@@ -46,66 +46,39 @@ function mapLocalToGlobalState(pack, state) {
     return { translateX: localX, translateY: localY, scale };
 }
 
-function getPackLimits(pack, img, scale) {
-    let horizontalPadding;
-    let verticalPadding;
-    let cols;
-    let rows;
-    let aspectRatio;
+const packConfig = {
+    p1: { hPad: 2, vPad: 3, cols: 4, rows: 4, aspectRatio: (img) => img.width / img.height },
+    p2: { hPad: 4, vPad: 3, cols: 2, rows: 4, aspectRatio: (img) => img.height / img.width },
+    p3: { hPad: 4, vPad: 6, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
+    p7: { hPad: 0, vPad: 0, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
+    p8: { hPad: 0, vPad: 0, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
+    p9: { hPad: 0, vPad: 0, cols: 1, rows: 2, aspectRatio: (img) => img.width / img.height },
+};
 
-    if (pack === 'p1') {
-        horizontalPadding = 2 * mmToPx;
-        verticalPadding = 3 * mmToPx;
-        cols = 4;
-        rows = 4;
-        aspectRatio = img.width / img.height;
-    } else if (pack === 'p2') {
-        horizontalPadding = 4 * mmToPx;
-        verticalPadding = 3 * mmToPx;
-        cols = 2;
-        rows = 4;
-        aspectRatio = img.height / img.width;
-    } else if (pack === 'p3') {
-        horizontalPadding = 4 * mmToPx;
-        verticalPadding = 6 * mmToPx;
-        cols = 2;
-        rows = 2;
-        aspectRatio = img.width / img.height;
-    } else if (pack === 'p7') {
-        horizontalPadding = 0;
-        verticalPadding = 0;
-        cols = 2;
-        rows = 2;
-        aspectRatio = img.width / img.height;
-    } else if (pack === 'p8') {
-        horizontalPadding = 0;
-        verticalPadding = 0;
-        cols = 2;
-        rows = 2;
-        aspectRatio = img.width / img.height;
-    } else if (pack === 'p9') {
-        horizontalPadding = 0;
-        verticalPadding = 0;
-        cols = 1;
-        rows = 2;
-        aspectRatio = img.width / img.height;
-    } else {
-        return { maxPanX: 0, maxPanY: 0 };
-    }
+const packCellSizeOverride = {
+    p7: () => [35 * mmToPx, 45 * mmToPx],
+    p8: () => [33 * mmToPx, 48 * mmToPx],
+    p9: () => {
+        const dpi = 320;
+        return [2 * dpi, 2 * dpi];
+    },
+};
+
+function getPackLimits(pack, img, scale) {
+    const cfg = packConfig[pack];
+    if (!cfg) return { maxPanX: 0, maxPanY: 0 };
+
+    const horizontalPadding = cfg.hPad * mmToPx;
+    const verticalPadding = cfg.vPad * mmToPx;
+    const cols = cfg.cols;
+    const rows = cfg.rows;
+    const aspectRatio = cfg.aspectRatio(img);
 
     let cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
     let cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
 
-    if (pack === 'p7') {
-        cellWidth = 35 * mmToPx;
-        cellHeight = 45 * mmToPx;
-    } else if (pack === 'p8') {
-        cellWidth = 33 * mmToPx;
-        cellHeight = 48 * mmToPx;
-    } else if (pack === 'p9') {
-        const dpi = 320;
-        cellWidth = 2 * dpi;
-        cellHeight = 2 * dpi;
+    if (packCellSizeOverride[pack]) {
+        [cellWidth, cellHeight] = packCellSizeOverride[pack]();
     }
 
     const cellRatio = cellWidth / cellHeight;
@@ -152,7 +125,6 @@ function clampFigureState(figure) {
     const state = figure._state;
     if (!pack || !movablePacks.has(pack) || !img || !state) return;
 
-    // Keep state clamped in the canonical p1 coordinate system.
     const normalized = normalizedStateFromPack('p1', state, img);
     const clamped = stateForPack('p1', normalized, img);
 
