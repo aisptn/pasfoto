@@ -13,6 +13,15 @@ const finalWidth = 1120;
 const finalHeight = 1600;
 const mmToPx = 320 / 25.4;
 
+function getFigurePreviewSize() {
+    // figure width and height are defined in style.css; match those values dynamically
+    const figure = document.querySelector('figure') || document.createElement('figure');
+    const style = getComputedStyle(figure);
+    const width = parseFloat(style.width) || 360;
+    const height = parseFloat(style.height) || 512;
+    return { width, height };
+}
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
@@ -427,13 +436,22 @@ function addControls(figure, currentIndex) {
     const sectionB = document.createElement('section');
     const fieldset = document.createElement('fieldset');
 
+    const fileMenu = document.createElement('menu');
+    const removeButton = document.createElement('input');
+    removeButton.type = 'button';
+    removeButton.value = 'remove';
+    fileMenu.appendChild(removeButton);
+    sectionA.appendChild(fileMenu);
+    fieldset.appendChild(sectionA);
+
+
     const moveMenu = document.createElement('menu');
     ['left', 'right', 'up', 'down'].forEach(direction => {
         const button = document.createElement('input');
         button.type = 'button';
-        button.value = direction === 'left' ? ' ← ' :
-            direction === 'right' ? ' → ' :
-                direction === 'up' ? ' ↑ ' : ' ↓ ';
+        button.value = direction === 'left' ? '←' :
+            direction === 'right' ? '→' :
+                direction === 'up' ? '↑' : '↓';
         button.className = direction;
         button.name = 'move';
         moveMenu.appendChild(button);
@@ -446,14 +464,14 @@ function addControls(figure, currentIndex) {
     ['zoom-out', 'zoom-in'].forEach(zoom => {
         const button = document.createElement('input');
         button.type = 'button';
-        button.value = zoom === 'zoom-in' ? ' + ' : ' - ';
+        button.value = zoom === 'zoom-in' ? '+' : '-';
         button.className = zoom;
         button.name = 'zoom';
         zoomMenu.appendChild(button);
     });
 
     sectionA.appendChild(zoomMenu);
-    fieldset.appendChild(sectionB);
+    fieldset.appendChild(sectionA);
 
     const packMenu = document.createElement('menu');
     for (let i = 1; i <= 9; i++) {
@@ -485,10 +503,11 @@ function handleFiles(files) {
             img.onload = () => {
                 const currentIndex = figureCount++;
                 const aspectRatio = img.width / img.height;
-                let targetWidth = 360;
+                const { width: defaultWidth, height: maxHeight } = getFigurePreviewSize();
+                let targetWidth = defaultWidth;
                 let targetHeight = targetWidth / aspectRatio;
-                if (targetHeight > 512) {
-                    targetHeight = 512;
+                if (targetHeight > maxHeight) {
+                    targetHeight = maxHeight;
                     targetWidth = targetHeight * aspectRatio;
                 }
 
@@ -511,12 +530,9 @@ function handleFiles(files) {
                 updateFigure(figure);
             };
             img.src = event.target.result;
+            stateCheck();
         };
         reader.readAsDataURL(file);
-
-        description.style.display = 'none';
-        saveButton.disabled = false;
-        clearButton.disabled = false;
     }
 }
 
@@ -576,6 +592,14 @@ function indexToAlphaSuffix(index) {
 }
 
 section.addEventListener('click', (event) => {
+    if (event.target.type === 'button' && event.target.value === 'remove') {
+        const figure = event.target.closest('figure');
+        if (figure) {
+            figure.remove();
+            stateCheck();
+        }
+        return;
+    }
     if (!(event.target.name === 'move' || event.target.name === 'zoom')) return;
     const figure = event.target.closest('figure');
     if (!figure) return;
@@ -870,8 +894,19 @@ clearButton.addEventListener('click', () => {
         while (section.firstChild) {
             section.removeChild(section.firstChild);
         }
+        stateCheck();
+    }
+});
+
+function stateCheck() {
+    const figureCount = section.querySelectorAll('figure').length;
+    if (figureCount === 0) {
         description.style.display = 'block';
         saveButton.disabled = true;
         clearButton.disabled = true;
+    } else {
+        description.style.display = 'none';
+        saveButton.disabled = false;
+        clearButton.disabled = false;
     }
-});
+}
