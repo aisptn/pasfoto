@@ -5,126 +5,29 @@ const formatButton = document.getElementById('format');
 const qualityButton = document.getElementById('quality');
 const section = document.querySelector('section');
 const description = section.querySelector('h1');
+
 const readFormats = ['image/avif', 'image/bmp', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
 const writeFormats = ['jpeg', 'png', 'webp'];
-const packButtons = document.querySelectorAll('input[name="pack"]');
-const zoomButtons = document.querySelectorAll('input[name="zoom"]');
-function p1(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const horizontalPadding = 2 * 320 / 25.4;
-    const verticalPadding = 3 * 320 / 25.4;
-    const cols = 4;
-    const rows = 4;
-    const automapScale = 0.978;
-    const cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
-    const cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
-    const aspectRatio = img.width / img.height;
-    const cellRatio = cellWidth / cellHeight;
-    const baseDrawWidth = aspectRatio > cellRatio ? cellHeight * aspectRatio : cellWidth;
-    const baseDrawHeight = aspectRatio > cellRatio ? cellHeight : cellWidth / aspectRatio;
-    state.scale = Math.max(1, state.scale);
-    const drawWidth = baseDrawWidth * state.scale;
-    const drawHeight = baseDrawHeight * state.scale;
-    const maxPanX = Math.max(0, Math.abs((drawWidth - cellWidth) / 2));
-    const maxPanY = Math.max(0, Math.abs((drawHeight - cellHeight) / 2));
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
-    const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = finalWidth;
-    tempCanvas.height = finalHeight;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.fillStyle = 'white';
-    tempCtx.fillRect(0, 0, finalWidth, finalHeight);
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const x = horizontalPadding + col * (cellWidth + horizontalPadding);
-            const y = verticalPadding + row * (cellHeight + verticalPadding);
-            tempCtx.save();
-            tempCtx.beginPath();
-            tempCtx.rect(x, y, cellWidth, cellHeight);
-            tempCtx.clip();
-            tempCtx.drawImage(img, x + (cellWidth - drawWidth) / 2 + offsetX, y + (cellHeight - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-            tempCtx.restore();
-        }
-    }
-    const finalOffsetX = (finalWidth * (1 - automapScale)) / 2;
-    const finalOffsetY = (finalHeight * (1 - automapScale)) / 2;
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, finalWidth, finalHeight);
-    ctx.drawImage(tempCanvas, finalOffsetX, finalOffsetY, finalWidth * automapScale, finalHeight * automapScale);
+
+const finalWidth = 1120;
+const finalHeight = 1600;
+const mmToPx = 320 / 25.4;
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
 }
-function p2(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const horizontalPadding = 4 * 320 / 25.4;
-    const verticalPadding = 3 * 320 / 25.4;
-    const cols = 2;
-    const rows = 4;
-    const automapScale = 0.978;
-    const rotated = document.createElement('canvas');
-    rotated.width = img.height;
-    rotated.height = img.width;
-    const rotatedCtx = rotated.getContext('2d');
-    rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-    rotatedCtx.rotate(Math.PI / 2);
-    rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
-    const cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
-    const cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
-    const aspectRatio = rotated.width / rotated.height;
-    const cellRatio = cellWidth / cellHeight;
-    const baseDrawWidth = aspectRatio > cellRatio ? cellHeight * aspectRatio : cellWidth;
-    const baseDrawHeight = aspectRatio > cellRatio ? cellHeight : cellWidth / aspectRatio;
-    state.scale = Math.max(1, state.scale);
-    const drawWidth = baseDrawWidth * state.scale;
-    const drawHeight = baseDrawHeight * state.scale;
-    const maxPanX = Math.max(0, Math.abs((drawWidth - cellWidth) / 2));
-    const maxPanY = Math.max(0, Math.abs((drawHeight - cellHeight) / 2));
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
-    const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = finalWidth;
-    tempCanvas.height = finalHeight;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.fillStyle = 'white';
-    tempCtx.fillRect(0, 0, finalWidth, finalHeight);
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const x = horizontalPadding + col * (cellWidth + horizontalPadding);
-            const y = verticalPadding + row * (cellHeight + verticalPadding);
-            tempCtx.save();
-            tempCtx.beginPath();
-            tempCtx.rect(x, y, cellWidth, cellHeight);
-            tempCtx.clip();
-            tempCtx.drawImage(rotated, x + (cellWidth - drawWidth) / 2 + offsetX, y + (cellHeight - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-            tempCtx.restore();
-        }
-    }
-    const finalOffsetX = (finalWidth * (1 - automapScale)) / 2;
-    const finalOffsetY = (finalHeight * (1 - automapScale)) / 2;
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, finalWidth, finalHeight);
-    ctx.drawImage(tempCanvas, finalOffsetX, finalOffsetY, finalWidth * automapScale, finalHeight * automapScale);
-}
+
 function mapP2GlobalToLocalState(state) {
     const globalX = state.translateX || 0;
     const globalY = state.translateY || 0;
     const scale = state.scale || 1;
     return { translateX: -globalY, translateY: globalX, scale };
 }
+
 function mapGlobalToLocalState(pack, state, img) {
+    if (!state) return { translateX: 0, translateY: 0, scale: 1 };
     const normalized = normalizedStateFromPack('p1', state, img);
-    const scale = normalized.scale;
     if (pack === 'p1') {
-        const limits = getPackLimits('p1', img, scale);
         return stateForPack('p1', normalized, img);
     }
     if (pack === 'p2' || pack === 'p3' || pack === 'p7' || pack === 'p8' || pack === 'p9') {
@@ -132,6 +35,7 @@ function mapGlobalToLocalState(pack, state, img) {
     }
     return { translateX: state.translateX, translateY: state.translateY, scale: state.scale };
 }
+
 function mapLocalToGlobalState(pack, state) {
     const localX = state.translateX || 0;
     const localY = state.translateY || 0;
@@ -141,32 +45,29 @@ function mapLocalToGlobalState(pack, state) {
     }
     return { translateX: localX, translateY: localY, scale };
 }
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
+
 function getPackLimits(pack, img, scale) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
     let horizontalPadding;
     let verticalPadding;
     let cols;
     let rows;
     let aspectRatio;
+
     if (pack === 'p1') {
-        horizontalPadding = 2 * 320 / 25.4;
-        verticalPadding = 3 * 320 / 25.4;
+        horizontalPadding = 2 * mmToPx;
+        verticalPadding = 3 * mmToPx;
         cols = 4;
         rows = 4;
         aspectRatio = img.width / img.height;
     } else if (pack === 'p2') {
-        horizontalPadding = 4 * 320 / 25.4;
-        verticalPadding = 3 * 320 / 25.4;
+        horizontalPadding = 4 * mmToPx;
+        verticalPadding = 3 * mmToPx;
         cols = 2;
         rows = 4;
         aspectRatio = img.height / img.width;
     } else if (pack === 'p3') {
-        horizontalPadding = 4 * 320 / 25.4;
-        verticalPadding = 6 * 320 / 25.4;
+        horizontalPadding = 4 * mmToPx;
+        verticalPadding = 6 * mmToPx;
         cols = 2;
         rows = 2;
         aspectRatio = img.width / img.height;
@@ -191,14 +92,14 @@ function getPackLimits(pack, img, scale) {
     } else {
         return { maxPanX: 0, maxPanY: 0 };
     }
+
     let cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
     let cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
+
     if (pack === 'p7') {
-        const mmToPx = 320 / 25.4;
         cellWidth = 35 * mmToPx;
         cellHeight = 45 * mmToPx;
     } else if (pack === 'p8') {
-        const mmToPx = 320 / 25.4;
         cellWidth = 33 * mmToPx;
         cellHeight = 48 * mmToPx;
     } else if (pack === 'p9') {
@@ -206,16 +107,19 @@ function getPackLimits(pack, img, scale) {
         cellWidth = 2 * dpi;
         cellHeight = 2 * dpi;
     }
+
     const cellRatio = cellWidth / cellHeight;
     const baseDrawWidth = aspectRatio > cellRatio ? cellHeight * aspectRatio : cellWidth;
     const baseDrawHeight = aspectRatio > cellRatio ? cellHeight : cellWidth / aspectRatio;
     const drawWidth = baseDrawWidth * Math.max(1, scale);
     const drawHeight = baseDrawHeight * Math.max(1, scale);
+
     return {
         maxPanX: Math.max(0, Math.abs((drawWidth - cellWidth) / 2)),
         maxPanY: Math.max(0, Math.abs((drawHeight - cellHeight) / 2)),
     };
 }
+
 function normalizedStateFromPack(basePack, state, img) {
     const baseLimits = getPackLimits(basePack, img, state.scale);
     return {
@@ -224,6 +128,7 @@ function normalizedStateFromPack(basePack, state, img) {
         scale: state.scale,
     };
 }
+
 function stateForPack(pack, normalized, img) {
     const limits = getPackLimits(pack, img, normalized.scale);
     if (pack === 'p2') {
@@ -240,92 +145,162 @@ function stateForPack(pack, normalized, img) {
         scale: normalized.scale,
     };
 }
-function p3(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const horizontalPadding = 4 * 320 / 25.4;
-    const verticalPadding = 6 * 320 / 25.4;
-    const cols = 2;
-    const rows = 2;
-    const automapScale = 0.978;
-    const cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
-    const cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
+
+function clampFigureState(figure) {
+    const pack = figure.dataset.pack;
+    const img = figure._sourceImage;
+    const state = figure._state;
+    if (!pack || !movablePacks.has(pack) || !img || !state) return;
+
+    // Keep state clamped in the canonical p1 coordinate system.
+    const normalized = normalizedStateFromPack('p1', state, img);
+    const clamped = stateForPack('p1', normalized, img);
+
+    state.translateX = clamped.translateX;
+    state.translateY = clamped.translateY;
+    state.scale = Math.max(1, Math.min(3, state.scale));
+}
+
+function createTempCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
+    return canvas;
+}
+
+function drawImageBlock(ctx, img, x, y, cellWidth, cellHeight, state) {
     const aspectRatio = img.width / img.height;
     const cellRatio = cellWidth / cellHeight;
     const baseDrawWidth = aspectRatio > cellRatio ? cellHeight * aspectRatio : cellWidth;
     const baseDrawHeight = aspectRatio > cellRatio ? cellHeight : cellWidth / aspectRatio;
-    state.scale = Math.max(1, state.scale);
-    const drawWidth = baseDrawWidth * state.scale;
-    const drawHeight = baseDrawHeight * state.scale;
+
+    const scale = Math.max(1, state.scale);
+    const drawWidth = baseDrawWidth * scale;
+    const drawHeight = baseDrawHeight * scale;
+
     const maxPanX = Math.max(0, Math.abs((drawWidth - cellWidth) / 2));
     const maxPanY = Math.max(0, Math.abs((drawHeight - cellHeight) / 2));
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
     const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
     const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = finalWidth;
-    tempCanvas.height = finalHeight;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, cellWidth, cellHeight);
+    ctx.clip();
+    ctx.drawImage(img, x + (cellWidth - drawWidth) / 2 + offsetX, y + (cellHeight - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
+    ctx.restore();
+}
+
+function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotate90 = false) {
+    const useImg = rotate90 ? (() => {
+        const rotated = document.createElement('canvas');
+        rotated.width = img.height;
+        rotated.height = img.width;
+        const rotatedCtx = rotated.getContext('2d');
+        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
+        rotatedCtx.rotate(Math.PI / 2);
+        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
+        return rotated;
+    })() : img;
+
+    const cellWidth = (finalWidth - hPad * (cols + 1)) / cols;
+    const cellHeight = (finalHeight - vPad * (rows + 1)) / rows;
+
+    const tempCanvas = createTempCanvas();
     const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.imageSmoothingEnabled = true;
+    tempCtx.imageSmoothingQuality = 'high';
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, finalWidth, finalHeight);
+
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            const x = horizontalPadding + col * (cellWidth + horizontalPadding);
-            const y = verticalPadding + row * (cellHeight + verticalPadding);
-            tempCtx.save();
-            tempCtx.beginPath();
-            tempCtx.rect(x, y, cellWidth, cellHeight);
-            tempCtx.clip();
-            tempCtx.drawImage(img, x + (cellWidth - drawWidth) / 2 + offsetX, y + (cellHeight - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-            tempCtx.restore();
+            const x = hPad + col * (cellWidth + hPad);
+            const y = vPad + row * (cellHeight + vPad);
+            const xInt = Math.round(x);
+            const yInt = Math.round(y);
+            const wInt = Math.round(cellWidth);
+            const hInt = Math.round(cellHeight);
+            drawImageBlock(tempCtx, useImg, xInt, yInt, wInt, hInt, state);
         }
     }
-    const finalOffsetX = (finalWidth * (1 - automapScale)) / 2;
-    const finalOffsetY = (finalHeight * (1 - automapScale)) / 2;
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, finalWidth, finalHeight);
-    ctx.drawImage(tempCanvas, finalOffsetX, finalOffsetY, finalWidth * automapScale, finalHeight * automapScale);
+
+    const xOffset = (finalWidth * (1 - automapScale)) / 2;
+    const yOffset = (finalHeight * (1 - automapScale)) / 2;
+    const scaledCellWidth = Math.round(cellWidth * automapScale);
+    const scaledCellHeight = Math.round(cellHeight * automapScale);
+
+    ctx.drawImage(tempCanvas, xOffset, yOffset, finalWidth * automapScale, finalHeight * automapScale);
+
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const x = hPad + col * (cellWidth + hPad);
+            const y = vPad + row * (cellHeight + vPad);
+            const x2 = Math.round(xOffset + x * automapScale) + 0.5;
+            const y2 = Math.round(yOffset + y * automapScale) + 0.5;
+            ctx.strokeRect(x2, y2, scaledCellWidth, scaledCellHeight);
+        }
+    }
 }
-function p4(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
+
+function p1(canvas, img, state, automapScale = 0.978) {
+    renderGrid(canvas, img, state, 4, 4, 2 * mmToPx, 3 * mmToPx, automapScale, false);
+}
+
+function p2(canvas, img, state, automapScale = 0.978) {
+    renderGrid(canvas, img, state, 2, 4, 4 * mmToPx, 3 * mmToPx, automapScale, true);
+}
+
+function p3(canvas, img, state, automapScale = 0.978) {
+    renderGrid(canvas, img, state, 2, 2, 4 * mmToPx, 6 * mmToPx, automapScale, false);
+}
+
+function p4(canvas, img, state, automapScale = 0.978) {
     const normalized = normalizedStateFromPack('p1', state, img);
     const p1State = stateForPack('p1', normalized, img);
     const p2State = stateForPack('p2', normalized, img);
-    const p1Canvas = document.createElement('canvas');
-    p1Canvas.width = finalWidth;
-    p1Canvas.height = finalHeight;
-    p1(p1Canvas, img, p1State);
-    const p2Canvas = document.createElement('canvas');
-    p2Canvas.width = finalWidth;
-    p2Canvas.height = finalHeight;
-    p2(p2Canvas, img, p2State);
+
+    const p1Canvas = createTempCanvas();
+    const p2Canvas = createTempCanvas();
+    p1(p1Canvas, img, p1State, automapScale);
+    p2(p2Canvas, img, p2State, automapScale);
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, finalWidth, finalHeight);
     const halfHeight = finalHeight / 2;
     ctx.drawImage(p1Canvas, 0, 0, finalWidth, halfHeight, 0, 0, finalWidth, halfHeight);
     ctx.drawImage(p2Canvas, 0, halfHeight, finalWidth, halfHeight, 0, halfHeight, finalWidth, halfHeight);
 }
-function p5(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = finalWidth;
-    tempCanvas.height = finalHeight;
-    const tempCtx = tempCanvas.getContext('2d');
+
+function p5(canvas, img, state, automapScale = 0.978) {
     const normalized = normalizedStateFromPack('p1', state, img);
     const p1State = stateForPack('p1', normalized, img);
     const p3State = stateForPack('p3', normalized, img);
-    p3(tempCanvas, img, p3State);
+
+    const tempCanvas = createTempCanvas();
+    const tempCtx = tempCanvas.getContext('2d');
+    p3(tempCanvas, img, p3State, automapScale);
     const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p1(tempCanvas, img, p1State);
+    p1(tempCanvas, img, p1State, automapScale);
     const p1Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
+
     for (let i = 0; i < p1Data.data.length; i += 4) {
         const y = Math.floor((i / 4) / finalWidth);
         if (y < finalHeight / 2) {
@@ -335,25 +310,27 @@ function p5(canvas, img, state) {
             p3Data.data[i + 3] = p1Data.data[i + 3];
         }
     }
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.putImageData(p3Data, 0, 0);
 }
-function p6(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = finalWidth;
-    tempCanvas.height = finalHeight;
-    const tempCtx = tempCanvas.getContext('2d');
+
+function p6(canvas, img, state, automapScale = 0.978) {
     const normalized = normalizedStateFromPack('p1', state, img);
-    const p3State = stateForPack('p3', normalized, img);
     const p2State = stateForPack('p2', normalized, img);
-    p3(tempCanvas, img, p3State);
+    const p3State = stateForPack('p3', normalized, img);
+
+    const tempCanvas = createTempCanvas();
+    const tempCtx = tempCanvas.getContext('2d');
+    p3(tempCanvas, img, p3State, automapScale);
     const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p2(tempCanvas, img, p2State);
+    p2(tempCanvas, img, p2State, automapScale);
     const p2Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
+
     for (let i = 0; i < p2Data.data.length; i += 4) {
         const y = Math.floor((i / 4) / finalWidth);
         if (y < finalHeight / 2) {
@@ -363,150 +340,91 @@ function p6(canvas, img, state) {
             p3Data.data[i + 3] = p2Data.data[i + 3];
         }
     }
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.putImageData(p3Data, 0, 0);
 }
+
+function drawSmallPack(canvas, img, state, subWidth, subHeight) {
+    const cols = 2;
+    const rows = (subHeight === 2 * 320 ? 2 : 2);
+    const cellWidth = finalWidth / cols;
+    const cellHeight = finalHeight / rows;
+
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, finalWidth, finalHeight);
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            if (canvas === undefined) continue;
+            const x = col * cellWidth + (cellWidth - subWidth) / 2;
+            const y = row * cellHeight + (cellHeight - subHeight) / 2;
+            const xInt = Math.round(x);
+            const yInt = Math.round(y);
+            const subWidthInt = Math.round(subWidth);
+            const subHeightInt = Math.round(subHeight);
+            drawImageBlock(ctx, img, xInt, yInt, subWidthInt, subHeightInt, state);
+
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(xInt + 0.5, yInt + 0.5, subWidthInt, subHeightInt);
+        }
+    }
+}
+
 function p7(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const cols = 2;
-    const rows = 2;
-    const cellWidth = finalWidth / cols;
-    const cellHeight = finalHeight / rows;
-    const mmToPx = 320 / 25.4;
-    const subWidth = 35 * mmToPx;
-    const subHeight = 45 * mmToPx;
-    const drawImageCell = (ctx, x, y, width, height) => {
-        const aspectRatio = img.width / img.height;
-        const cellRatio = width / height;
-        const baseDrawWidth = aspectRatio > cellRatio ? height * aspectRatio : width;
-        const baseDrawHeight = aspectRatio > cellRatio ? height : width / aspectRatio;
-        const normalizedScale = Math.max(1, state.scale);
-        const drawWidth = baseDrawWidth * normalizedScale;
-        const drawHeight = baseDrawHeight * normalizedScale;
-        const maxPanX = Math.max(0, Math.abs((drawWidth - width) / 2));
-        const maxPanY = Math.max(0, Math.abs((drawHeight - height) / 2));
-        const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-        const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
-        const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x, y, width, height);
-        ctx.clip();
-        ctx.drawImage(img, x + (width - drawWidth) / 2 + offsetX, y + (height - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-        ctx.restore();
-    };
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, finalWidth, finalHeight);
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const x = col * cellWidth + (cellWidth - subWidth) / 2;
-            const y = row * cellHeight + (cellHeight - subHeight) / 2;
-            drawImageCell(ctx, x, y, subWidth, subHeight);
-        }
-    }
+    drawSmallPack(canvas, img, state, 35 * mmToPx, 45 * mmToPx);
 }
+
 function p8(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
-    const cols = 2;
-    const rows = 2;
-    const cellWidth = finalWidth / cols;
-    const cellHeight = finalHeight / rows;
-    const mmToPx = 320 / 25.4;
-    const subWidth = 33 * mmToPx;
-    const subHeight = 48 * mmToPx;
-    const drawImageCell = (ctx, x, y, width, height) => {
-        const aspectRatio = img.width / img.height;
-        const cellRatio = width / height;
-        const baseDrawWidth = aspectRatio > cellRatio ? height * aspectRatio : width;
-        const baseDrawHeight = aspectRatio > cellRatio ? height : width / aspectRatio;
-        const normalizedScale = Math.max(1, state.scale);
-        const drawWidth = baseDrawWidth * normalizedScale;
-        const drawHeight = baseDrawHeight * normalizedScale;
-        const maxPanX = Math.max(0, Math.abs((drawWidth - width) / 2));
-        const maxPanY = Math.max(0, Math.abs((drawHeight - height) / 2));
-        const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-        const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
-        const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x, y, width, height);
-        ctx.clip();
-        ctx.drawImage(img, x + (width - drawWidth) / 2 + offsetX, y + (height - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-        ctx.restore();
-    };
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, finalWidth, finalHeight);
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const x = col * cellWidth + (cellWidth - subWidth) / 2;
-            const y = row * cellHeight + (cellHeight - subHeight) / 2;
-            drawImageCell(ctx, x, y, subWidth, subHeight);
-        }
-    }
+    drawSmallPack(canvas, img, state, 33 * mmToPx, 48 * mmToPx);
 }
+
 function p9(canvas, img, state) {
-    const finalWidth = 1120;
-    const finalHeight = 1600;
+    const dpi = 320;
+    const subWidth = 2 * dpi;
+    const subHeight = 2 * dpi;
     const cols = 1;
     const rows = 2;
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
-    const dpi = 320;
-    const subWidth = 2 * dpi;
-    const subHeight = 2 * dpi;
-    const drawImageCell = (ctx, x, y, width, height) => {
-        const aspectRatio = img.width / img.height;
-        const cellRatio = width / height;
-        const baseDrawWidth = aspectRatio > cellRatio ? height * aspectRatio : width;
-        const baseDrawHeight = aspectRatio > cellRatio ? height : width / aspectRatio;
-        const normalizedScale = Math.max(1, state.scale);
-        const drawWidth = baseDrawWidth * normalizedScale;
-        const drawHeight = baseDrawHeight * normalizedScale;
-        const maxPanX = Math.max(0, Math.abs((drawWidth - width) / 2));
-        const maxPanY = Math.max(0, Math.abs((drawHeight - height) / 2));
-        const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-        const offsetX = clamp(state.translateX, -maxPanX, maxPanX);
-        const offsetY = clamp(state.translateY, -maxPanY, maxPanY);
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x, y, width, height);
-        ctx.clip();
-        ctx.drawImage(img, x + (width - drawWidth) / 2 + offsetX, y + (height - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
-        ctx.restore();
-    };
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, finalWidth, finalHeight);
+
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+
     for (let row = 0; row < rows; row++) {
-        const y = row * cellHeight + (cellHeight - subHeight) / 2;
         const x = (cellWidth - subWidth) / 2;
-        drawImageCell(ctx, x, y, subWidth, subHeight);
+        const y = row * cellHeight + (cellHeight - subHeight) / 2;
+        const xInt = Math.round(x);
+        const yInt = Math.round(y);
+        const wInt = Math.round(subWidth);
+        const hInt = Math.round(subHeight);
+
+        drawImageBlock(ctx, img, xInt, yInt, wInt, hInt, state);
+        ctx.strokeRect(xInt + 0.5, yInt + 0.5, wInt, hInt);
     }
 }
-const packRenderers = {
-    p1,
-    p2,
-    p3,
-    p4,
-    p5,
-    p6,
-    p7,
-    p8,
-    p9,
-};
+
+const packRenderers = { p1, p2, p3, p4, p5, p6, p7, p8, p9 };
 const movablePacks = new Set(Object.keys(packRenderers));
+
 function updateFigure(figure) {
     const c = figure.querySelector('canvas');
     if (!c) return;
@@ -520,6 +438,7 @@ function updateFigure(figure) {
         c.dataset.processed = pack;
         return;
     }
+
     const previewWidth = figure._previewSize?.width ?? c.width;
     const previewHeight = figure._previewSize?.height ?? c.height;
     c.width = previewWidth;
@@ -530,10 +449,12 @@ function updateFigure(figure) {
     cctx.drawImage(figure._sourceImage, 0, 0, previewWidth, previewHeight);
     c.dataset.processed = '';
 }
+
 function addControls(figure, currentIndex) {
     const sectionA = document.createElement('section');
     const sectionB = document.createElement('section');
     const fieldset = document.createElement('fieldset');
+
     const moveMenu = document.createElement('menu');
     ['left', 'right', 'up', 'down'].forEach(direction => {
         const button = document.createElement('input');
@@ -545,8 +466,10 @@ function addControls(figure, currentIndex) {
         button.name = 'move';
         moveMenu.appendChild(button);
     });
+
     sectionA.appendChild(moveMenu);
     fieldset.appendChild(sectionA);
+
     const zoomMenu = document.createElement('menu');
     ['zoom-out', 'zoom-in'].forEach(zoom => {
         const button = document.createElement('input');
@@ -556,8 +479,10 @@ function addControls(figure, currentIndex) {
         button.name = 'zoom';
         zoomMenu.appendChild(button);
     });
+
     sectionA.appendChild(zoomMenu);
     fieldset.appendChild(sectionB);
+
     const packMenu = document.createElement('menu');
     for (let i = 1; i <= 9; i++) {
         const label = document.createElement('label');
@@ -572,11 +497,14 @@ function addControls(figure, currentIndex) {
         label.appendChild(input);
         packMenu.appendChild(label);
     }
+
     sectionB.appendChild(packMenu);
     fieldset.appendChild(sectionB);
     figure.appendChild(fieldset);
 }
+
 let figureCount = 0;
+
 function handleFiles(files) {
     for (const file of files) {
         const reader = new FileReader();
@@ -591,18 +519,21 @@ function handleFiles(files) {
                     targetHeight = 512;
                     targetWidth = targetHeight * aspectRatio;
                 }
+
                 const figure = document.createElement('figure');
                 const canvas = document.createElement('canvas');
                 canvas.width = targetWidth;
                 canvas.height = targetHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
                 figure._sourceImage = img;
                 figure._previewSize = { width: targetWidth, height: targetHeight };
                 figure._state = { translateX: 0, translateY: 0, scale: 1 };
                 figure.dataset.pack = '';
                 figure.appendChild(canvas);
                 section.appendChild(figure);
+
                 addControls(figure, currentIndex);
                 figure._updateFigure = updateFigure;
                 updateFigure(figure);
@@ -610,23 +541,28 @@ function handleFiles(files) {
             img.src = event.target.result;
         };
         reader.readAsDataURL(file);
+
         description.style.display = 'none';
         saveButton.disabled = false;
         clearButton.disabled = false;
     }
 }
+
 section.addEventListener('dragover', (event) => {
     event.preventDefault();
     section.classList.add('drop-hover');
 });
-section.addEventListener('dragleave', (event) => {
+
+section.addEventListener('dragleave', () => {
     section.classList.remove('drop-hover');
 });
+
 section.addEventListener('drop', (event) => {
     event.preventDefault();
     section.classList.remove('drop-hover');
     handleFiles(event.dataTransfer.files);
 });
+
 openButton.addEventListener('click', () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -637,16 +573,17 @@ openButton.addEventListener('click', () => {
     };
     input.click();
 });
+
 section.addEventListener('change', (event) => {
-    if (event.target.name.startsWith('pack-')) {
-        const figure = event.target.closest('figure');
-        if (!figure) return;
-        figure.dataset.pack = event.target.value;
-        if (figure._updateFigure) {
-            figure._updateFigure(figure);
-        }
+    if (!event.target.name.startsWith('pack-')) return;
+    const figure = event.target.closest('figure');
+    if (!figure) return;
+    figure.dataset.pack = event.target.value;
+    if (figure._updateFigure) {
+        figure._updateFigure(figure);
     }
 });
+
 function getMoveStep(figure, direction) {
     const img = figure._sourceImage;
     if (!img || !img.width || !img.height) return 15;
@@ -655,6 +592,7 @@ function getMoveStep(figure, direction) {
         : img.height * 0.01;
     return Math.max(1, Math.round(step));
 }
+
 function indexToAlphaSuffix(index) {
     let suffix = '';
     while (index > 0) {
@@ -664,6 +602,7 @@ function indexToAlphaSuffix(index) {
     }
     return suffix;
 }
+
 section.addEventListener('click', (event) => {
     if (!(event.target.name === 'move' || event.target.name === 'zoom')) return;
     const figure = event.target.closest('figure');
@@ -672,12 +611,12 @@ section.addEventListener('click', (event) => {
     if (!pack || !movablePacks.has(pack)) return;
     const state = figure._state;
     if (!state) return;
+
     if (event.target.name === 'move') {
-        if (state.scale <= 1) {
-            return;
-        }
+        if (state.scale <= 1) return;
         const direction = event.target.className;
         const moveStep = getMoveStep(figure, direction);
+
         if (pack === 'p2') {
             const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
             switch (direction) {
@@ -690,7 +629,7 @@ section.addEventListener('click', (event) => {
             state.translateX = global.translateX;
             state.translateY = global.translateY;
         } else {
-            switch (event.target.className) {
+            switch (direction) {
                 case 'left': state.translateX -= moveStep; break;
                 case 'right': state.translateX += moveStep; break;
                 case 'up': state.translateY -= moveStep; break;
@@ -705,6 +644,7 @@ section.addEventListener('click', (event) => {
             state.scale = Math.max(1, state.scale / 1.1);
         }
         const scaleRatio = state.scale / oldScale;
+
         if (pack === 'p2') {
             const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
             local.translateX *= scaleRatio;
@@ -718,11 +658,16 @@ section.addEventListener('click', (event) => {
             state.translateY *= scaleRatio;
         }
     }
+
+    clampFigureState(figure);
+
     if (figure._updateFigure) {
         figure._updateFigure(figure);
     }
 });
+
 let dragContext = null;
+
 section.addEventListener('pointerdown', (event) => {
     if (!(event.target instanceof HTMLCanvasElement)) return;
     const figure = event.target.closest('figure');
@@ -732,6 +677,7 @@ section.addEventListener('pointerdown', (event) => {
     const state = figure._state;
     if (!state) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+
     event.preventDefault();
     let subpack = null;
     if (figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') {
@@ -744,6 +690,7 @@ section.addEventListener('pointerdown', (event) => {
             subpack = y < half ? 'p2' : 'p3';
         }
     }
+
     dragContext = {
         figure,
         pointerId: event.pointerId,
@@ -753,8 +700,10 @@ section.addEventListener('pointerdown', (event) => {
         originY: state.translateY,
         subpack,
     };
+
     event.target.setPointerCapture(event.pointerId);
 });
+
 section.addEventListener('pointermove', (event) => {
     if (!dragContext || event.pointerId !== dragContext.pointerId) return;
     const figure = dragContext.figure;
@@ -762,8 +711,10 @@ section.addEventListener('pointermove', (event) => {
     if (!pack || !movablePacks.has(pack)) return;
     const state = figure._state;
     if (!state) return;
+
     const dx = event.clientX - dragContext.startX;
     const dy = event.clientY - dragContext.startY;
+
     if ((figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') && dragContext.subpack) {
         if (dragContext.subpack === 'p1' || dragContext.subpack === 'p3') {
             state.translateX = dragContext.originX + dx;
@@ -788,10 +739,14 @@ section.addEventListener('pointermove', (event) => {
         state.translateX = dragContext.originX + dx;
         state.translateY = dragContext.originY + dy;
     }
+
+    clampFigureState(figure);
+
     if (figure._updateFigure) {
         figure._updateFigure(figure);
     }
 });
+
 const endDrag = (event) => {
     if (!dragContext || event.pointerId !== dragContext.pointerId) return;
     const canvas = dragContext.figure.querySelector('canvas');
@@ -800,60 +755,85 @@ const endDrag = (event) => {
     }
     dragContext = null;
 };
+
 section.addEventListener('pointerup', endDrag);
 section.addEventListener('pointercancel', endDrag);
+
 [formatButton, qualityButton].forEach(button => {
     button.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     });
 });
+
 let currentFormatIndex = 0;
+let quality = 0.9;
+
 const updateQualityButtonState = () => {
     qualityButton.disabled = writeFormats[currentFormatIndex] === 'png';
     qualityButton.textContent = `quality: ${writeFormats[currentFormatIndex] === 'png' ? 1.0 : quality.toFixed(1)}`;
 };
+
 formatButton.textContent = `format: ${writeFormats[currentFormatIndex]}`;
+qualityButton.textContent = `quality: ${quality.toFixed(1)}`;
+
 formatButton.addEventListener('click', () => {
     currentFormatIndex = (currentFormatIndex + 1) % writeFormats.length;
     formatButton.textContent = `format: ${writeFormats[currentFormatIndex]}`;
     updateQualityButtonState();
 });
-formatButton.addEventListener('auxclick', (e) => {
+
+formatButton.addEventListener('auxclick', () => {
     currentFormatIndex = (currentFormatIndex - 1 + writeFormats.length) % writeFormats.length;
     formatButton.textContent = `format: ${writeFormats[currentFormatIndex]}`;
     updateQualityButtonState();
 });
-let quality = 0.9;
-qualityButton.textContent = `quality: ${quality.toFixed(1)}`;
+
 qualityButton.addEventListener('click', () => {
     quality = Math.min(1, quality + 0.1);
     qualityButton.textContent = `quality: ${quality.toFixed(1)}`;
 });
-qualityButton.addEventListener('auxclick', (e) => {
+
+qualityButton.addEventListener('auxclick', () => {
     quality = Math.max(0, quality - 0.1);
     qualityButton.textContent = `quality: ${quality.toFixed(1)}`;
 });
+
 qualityButton.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-        quality = Math.min(1, quality + 0.1);
-    } else {
-        quality = Math.max(0, quality - 0.1);
-    }
+    quality = e.deltaY < 0 ? Math.min(1, quality + 0.1) : Math.max(0, quality - 0.1);
     qualityButton.textContent = `quality: ${quality.toFixed(1)}`;
 });
+
 formatButton.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-        currentFormatIndex = (currentFormatIndex + 1) % writeFormats.length;
-    } else {
-        currentFormatIndex = (currentFormatIndex - 1 + writeFormats.length) % writeFormats.length;
-    }
+    currentFormatIndex = e.deltaY < 0
+        ? (currentFormatIndex + 1) % writeFormats.length
+        : (currentFormatIndex - 1 + writeFormats.length) % writeFormats.length;
     formatButton.textContent = `format: ${writeFormats[currentFormatIndex]}`;
     updateQualityButtonState();
 });
-saveButton.addEventListener('click', () => {
-    const section = document.querySelector('section');
+
+async function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                reject(new Error('Failed to convert canvas to blob'));
+                return;
+            }
+            resolve(blob);
+        }, type, quality);
+    });
+}
+
+function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+saveButton.addEventListener('click', async () => {
     const figures = section.querySelectorAll('figure');
     if (figures.length === 0) {
         alert('No images to save!');
@@ -867,38 +847,59 @@ saveButton.addEventListener('click', () => {
     });
 
     const packIndices = {};
-    figures.forEach((figure) => {
-        const canvas = figure.querySelector('canvas');
-        if (!canvas) return;
+    const jobs = Array.from(figures).map((figure) => {
         const pack = figure.dataset.pack || 'image';
         const count = packCounts[pack] || 0;
+
         let filenameBase = pack || 'image';
         if (count > 1) {
             const occ = (packIndices[pack] || 0) + 1;
             packIndices[pack] = occ;
             filenameBase = `${filenameBase}_${indexToAlphaSuffix(occ)}`;
         }
+
         const filename = `${filenameBase}.${writeFormats[currentFormatIndex]}`;
 
-        canvas.toBlob((blob) => {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(a.href);
-        }, `image/${writeFormats[currentFormatIndex]}`, quality);
-    });
-});
-clearButton.addEventListener('click', () => {
-    const section = document.querySelector('section');
-    if (section.children.length > 0) {
-        if (confirm('Clear all images?')) {
-            while (section.firstChild) {
-                section.removeChild(section.firstChild);
-            }
-            description.style.display = 'block';
-            saveButton.disabled = true;
-            clearButton.disabled = true;
+        let exportCanvas = figure.querySelector('canvas');
+        if (pack === 'image') {
+            exportCanvas = createTempCanvas();
+            const ctx = exportCanvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, finalWidth, finalHeight);
+            ctx.drawImage(figure._sourceImage, 0, 0, finalWidth, finalHeight);
+        } else if (packRenderers[pack]) {
+            const exportCanvasTemp = createTempCanvas();
+            const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
+                ? figure._state
+                : mapGlobalToLocalState(pack, figure._state, figure._sourceImage);
+            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
+            exportCanvas = exportCanvasTemp;
         }
+
+        return canvasToBlob(exportCanvas, `image/${writeFormats[currentFormatIndex]}`, quality)
+            .then((blob) => ({ blob, filename }));
+    });
+
+    try {
+        const results = await Promise.all(jobs);
+        results.forEach(({ blob, filename }) => {
+            downloadBlob(blob, filename);
+        });
+    } catch (error) {
+        console.error('Error exporting images:', error);
+        alert('Error while exporting images. Please try again.');
+    }
+});
+
+clearButton.addEventListener('click', () => {
+    if (section.children.length > 0 && confirm('Clear all images?')) {
+        while (section.firstChild) {
+            section.removeChild(section.firstChild);
+        }
+        description.style.display = 'block';
+        saveButton.disabled = true;
+        clearButton.disabled = true;
     }
 });
