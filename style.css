@@ -74,3 +74,6 @@ figure fieldset section {
 .drop-hover {
     border: 0.5rem dashed gray;
 }
+button, [type="button"] {
+    min-width: 2rem;
+}
