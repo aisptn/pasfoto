@@ -290,14 +290,14 @@ function p3(canvas, img, state, automapScale = 0.978) {
     renderGrid(canvas, img, state, 2, 2, 4 * mmToPx, 6 * mmToPx, automapScale, false);
 }
 
-function p4(canvas, img, state, automapScale = 0.978) {
-    const normalized = normalizedStateFromPack('p1', state, img);
-    const p1State = stateForPack('p1', normalized, img);
-    const p2State = stateForPack('p2', normalized, img);
+function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+    const normalized = normalizedStateFromPack('p1', state, img, size);
+    const p1State = stateForPack('p1', normalized, img, size);
+    const p2State = stateForPack('p2', normalized, img, 'full pack');
 
     const p1Canvas = createTempCanvas();
     const p2Canvas = createTempCanvas();
-    p1(p1Canvas, img, p1State, automapScale);
+    p1(p1Canvas, img, p1State, automapScale, size);
     p2(p2Canvas, img, p2State, automapScale);
 
     canvas.width = finalWidth;
@@ -312,16 +312,16 @@ function p4(canvas, img, state, automapScale = 0.978) {
     ctx.drawImage(p2Canvas, 0, halfHeight, finalWidth, halfHeight, 0, halfHeight, finalWidth, halfHeight);
 }
 
-function p5(canvas, img, state, automapScale = 0.978) {
-    const normalized = normalizedStateFromPack('p1', state, img);
-    const p1State = stateForPack('p1', normalized, img);
-    const p3State = stateForPack('p3', normalized, img);
+function p5(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+    const normalized = normalizedStateFromPack('p1', state, img, size);
+    const p1State = stateForPack('p1', normalized, img, size);
+    const p3State = stateForPack('p3', normalized, img, 'full pack');
 
     const tempCanvas = createTempCanvas();
     const tempCtx = tempCanvas.getContext('2d');
     p3(tempCanvas, img, p3State, automapScale);
     const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p1(tempCanvas, img, p1State, automapScale);
+    p1(tempCanvas, img, p1State, automapScale, size);
     const p1Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
 
     for (let i = 0; i < p1Data.data.length; i += 4) {
@@ -458,7 +458,7 @@ function updateFigure(figure) {
         const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
             ? figure._state
             : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, size);
-        if (pack === 'p1' || pack === 'p2') {
+        if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
             renderer(c, figure._sourceImage, renderState, 0.978, size);
         } else {
             renderer(c, figure._sourceImage, renderState);
@@ -648,7 +648,7 @@ section.addEventListener('change', (event) => {
         const figure = event.target.closest('figure');
         if (!figure) return;
         figure.dataset.size = event.target.value;
-        if ((figure.dataset.pack === 'p1' || figure.dataset.pack === 'p2') && figure._updateFigure) {
+        if ((figure.dataset.pack === 'p1' || figure.dataset.pack === 'p2' || figure.dataset.pack === 'p4' || figure.dataset.pack === 'p5') && figure._updateFigure) {
             figure._updateFigure(figure);
         }
         return;
@@ -961,7 +961,7 @@ saveButton.addEventListener('click', async () => {
             const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
                 ? figure._state
                 : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
-            if (pack === 'p1' || pack === 'p2') {
+            if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
                 packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
             } else {
                 packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
