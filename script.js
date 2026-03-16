@@ -244,7 +244,7 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
     }
 }
 
-function p1(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align = 'center', alignPadPx) {
     const hPad = 2 * mmToPx;
     const vPad = 3 * mmToPx;
     const cols = size === 'regular' ? 3 : 4;
@@ -254,7 +254,13 @@ function p1(canvas, img, state, automapScale = 0.978, size = 'full pack') {
         const fullCellWidth = (finalWidth - hPad * (fullCols + 1)) / fullCols;
         const fullCellHeight = (finalHeight - vPad * (rows + 1)) / rows;
         const totalWidth = cols * fullCellWidth + (cols + 1) * hPad;
-        const offsetX = (finalWidth - totalWidth) / 2;
+        let offsetX = (finalWidth - totalWidth) / 2;
+        if (align === 'left') {
+            offsetX = 0;
+        }
+        if (typeof alignPadPx === 'number') {
+            offsetX = alignPadPx - hPad;
+        }
         renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false, {
             fixedCellWidth: fullCellWidth,
             fixedCellHeight: fullCellHeight,
@@ -297,7 +303,7 @@ function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
 
     const p1Canvas = createTempCanvas();
     const p2Canvas = createTempCanvas();
-    p1(p1Canvas, img, p1State, automapScale, size);
+    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
     p2(p2Canvas, img, p2State, automapScale);
 
     canvas.width = finalWidth;
@@ -321,7 +327,7 @@ function p5(canvas, img, state, automapScale = 0.978, size = 'full pack') {
     const tempCtx = tempCanvas.getContext('2d');
     p3(tempCanvas, img, p3State, automapScale);
     const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p1(tempCanvas, img, p1State, automapScale, size);
+    p1(tempCanvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
     const p1Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
 
     for (let i = 0; i < p1Data.data.length; i += 4) {
@@ -500,7 +506,7 @@ function createSizeOptions(currentIndex) {
         input.id = uniqueId;
         input.name = `size-${currentIndex}`;
         input.value = size;
-        if (size === 'full pack') {
+        if (size === 'regular') {
             input.checked = true;
         }
         label.appendChild(input);
@@ -602,7 +608,7 @@ function handleFiles(files) {
                 figure._previewSize = { width: targetWidth, height: targetHeight };
                 figure._state = { translateX: 0, translateY: 0, scale: 1 };
                 figure.dataset.pack = '';
-                figure.dataset.size = 'full pack';
+                figure.dataset.size = 'regular';
                 figure.appendChild(canvas);
                 section.appendChild(figure);
 
