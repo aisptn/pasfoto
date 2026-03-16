@@ -32,11 +32,12 @@ function mapP2GlobalToLocalState(state) {
     return { translateX: -globalY, translateY: globalX, scale };
 }
 
-function mapGlobalToLocalState(pack, state, img) {
+function mapGlobalToLocalState(pack, state, img, size) {
     if (!state) return { translateX: 0, translateY: 0, scale: 1 };
-    const normalized = normalizedStateFromPack('p1', state, img);
+    const baseSize = pack === 'p1' ? size : 'full pack';
+    const normalized = normalizedStateFromPack('p1', state, img, baseSize);
     if (pack === 'p1') {
-        return stateForPack('p1', normalized, img);
+        return stateForPack('p1', normalized, img, baseSize);
     }
     if (pack === 'p2' || pack === 'p3' || pack === 'p7' || pack === 'p8' || pack === 'p9') {
         return stateForPack(pack, normalized, img);
@@ -72,18 +73,20 @@ const packCellSizeOverride = {
     },
 };
 
-function getPackLimits(pack, img, scale) {
+function getPackLimits(pack, img, scale, size) {
     const cfg = packConfig[pack];
     if (!cfg) return { maxPanX: 0, maxPanY: 0 };
 
     const horizontalPadding = cfg.hPad * mmToPx;
     const verticalPadding = cfg.vPad * mmToPx;
-    const cols = cfg.cols;
-    const rows = cfg.rows;
+    const cols = (pack === 'p1' && size === 'regular') ? 3 : cfg.cols;
+    const rows = (pack === 'p1' && size === 'regular') ? 4 : cfg.rows;
+    const cellCols = (pack === 'p1' && size === 'regular') ? cfg.cols : cols;
+    const cellRows = (pack === 'p1' && size === 'regular') ? cfg.rows : rows;
     const aspectRatio = cfg.aspectRatio(img);
 
-    let cellWidth = (finalWidth - horizontalPadding * (cols + 1)) / cols;
-    let cellHeight = (finalHeight - verticalPadding * (rows + 1)) / rows;
+    let cellWidth = (finalWidth - horizontalPadding * (cellCols + 1)) / cellCols;
+    let cellHeight = (finalHeight - verticalPadding * (cellRows + 1)) / cellRows;
 
     if (packCellSizeOverride[pack]) {
         [cellWidth, cellHeight] = packCellSizeOverride[pack]();
@@ -101,8 +104,8 @@ function getPackLimits(pack, img, scale) {
     };
 }
 
-function normalizedStateFromPack(basePack, state, img) {
-    const baseLimits = getPackLimits(basePack, img, state.scale);
+function normalizedStateFromPack(basePack, state, img, size) {
+    const baseLimits = getPackLimits(basePack, img, state.scale, size);
     return {
         x: baseLimits.maxPanX ? clamp(state.translateX / baseLimits.maxPanX, -1, 1) : 0,
         y: baseLimits.maxPanY ? clamp(state.translateY / baseLimits.maxPanY, -1, 1) : 0,
@@ -110,8 +113,8 @@ function normalizedStateFromPack(basePack, state, img) {
     };
 }
 
-function stateForPack(pack, normalized, img) {
-    const limits = getPackLimits(pack, img, normalized.scale);
+function stateForPack(pack, normalized, img, size) {
+    const limits = getPackLimits(pack, img, normalized.scale, size);
     if (pack === 'p2') {
         const rotated = {
             translateX: normalized.x * limits.maxPanY,
@@ -129,12 +132,14 @@ function stateForPack(pack, normalized, img) {
 
 function clampFigureState(figure) {
     const pack = figure.dataset.pack;
+    const size = figure.dataset.size || 'full pack';
     const img = figure._sourceImage;
     const state = figure._state;
     if (!pack || !movablePacks.has(pack) || !img || !state) return;
 
-    const normalized = normalizedStateFromPack('p1', state, img);
-    const clamped = stateForPack('p1', normalized, img);
+    const baseSize = pack === 'p1' ? size : 'full pack';
+    const normalized = normalizedStateFromPack('p1', state, img, baseSize);
+    const clamped = stateForPack('p1', normalized, img, baseSize);
 
     state.translateX = clamped.translateX;
     state.translateY = clamped.translateY;
@@ -172,7 +177,7 @@ function drawImageBlock(ctx, img, x, y, cellWidth, cellHeight, state) {
     ctx.restore();
 }
 
-function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotate90 = false) {
+function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotate90 = false, options = {}) {
     const useImg = rotate90 ? (() => {
         const rotated = document.createElement('canvas');
         rotated.width = img.height;
@@ -184,8 +189,10 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
         return rotated;
     })() : img;
 
-    const cellWidth = (finalWidth - hPad * (cols + 1)) / cols;
-    const cellHeight = (finalHeight - vPad * (rows + 1)) / rows;
+    const cellWidth = options.fixedCellWidth ?? ((finalWidth - hPad * (cols + 1)) / cols);
+    const cellHeight = options.fixedCellHeight ?? ((finalHeight - vPad * (rows + 1)) / rows);
+    const baseOffsetX = options.offsetX ?? 0;
+    const baseOffsetY = options.offsetY ?? 0;
 
     const tempCanvas = createTempCanvas();
     const tempCtx = tempCanvas.getContext('2d');
@@ -196,8 +203,8 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            const x = hPad + col * (cellWidth + hPad);
-            const y = vPad + row * (cellHeight + vPad);
+            const x = baseOffsetX + hPad + col * (cellWidth + hPad);
+            const y = baseOffsetY + vPad + row * (cellHeight + vPad);
             const xInt = Math.round(x);
             const yInt = Math.round(y);
             const wInt = Math.round(cellWidth);
@@ -226,8 +233,8 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            const x = hPad + col * (cellWidth + hPad);
-            const y = vPad + row * (cellHeight + vPad);
+            const x = baseOffsetX + hPad + col * (cellWidth + hPad);
+            const y = baseOffsetY + vPad + row * (cellHeight + vPad);
             const x2 = Math.round(xOffset + x * automapScale) + 0.5;
             const y2 = Math.round(yOffset + y * automapScale) + 0.5;
             ctx.strokeRect(x2, y2, scaledCellWidth, scaledCellHeight);
@@ -235,8 +242,25 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
     }
 }
 
-function p1(canvas, img, state, automapScale = 0.978) {
-    renderGrid(canvas, img, state, 4, 4, 2 * mmToPx, 3 * mmToPx, automapScale, false);
+function p1(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+    const hPad = 2 * mmToPx;
+    const vPad = 3 * mmToPx;
+    const cols = size === 'regular' ? 3 : 4;
+    const rows = 4;
+    if (size === 'regular') {
+        const fullCols = 4;
+        const fullCellWidth = (finalWidth - hPad * (fullCols + 1)) / fullCols;
+        const fullCellHeight = (finalHeight - vPad * (rows + 1)) / rows;
+        const totalWidth = cols * fullCellWidth + (cols + 1) * hPad;
+        const offsetX = (finalWidth - totalWidth) / 2;
+        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false, {
+            fixedCellWidth: fullCellWidth,
+            fixedCellHeight: fullCellHeight,
+            offsetX,
+        });
+        return;
+    }
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false);
 }
 
 function p2(canvas, img, state, automapScale = 0.978) {
@@ -409,12 +433,17 @@ function updateFigure(figure) {
     const c = figure.querySelector('canvas');
     if (!c) return;
     const pack = figure.dataset.pack;
+    const size = figure.dataset.size || 'full pack';
     const renderer = packRenderers[pack];
     if (typeof renderer === 'function') {
         const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
             ? figure._state
-            : mapGlobalToLocalState(pack, figure._state, figure._sourceImage);
-        renderer(c, figure._sourceImage, renderState);
+            : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, size);
+        if (pack === 'p1') {
+            renderer(c, figure._sourceImage, renderState, 0.978, size);
+        } else {
+            renderer(c, figure._sourceImage, renderState);
+        }
         c.dataset.processed = pack;
         return;
     }
@@ -443,7 +472,8 @@ function createSizeOptions(currentIndex) {
     const sizeMenu = document.createElement('menu');
     ['regular', 'full pack'].forEach(size => {
         const label = document.createElement('label');
-        const uniqueId = `size-${currentIndex}`;
+        const sizeSlug = size.replace(/\s+/g, '-');
+        const uniqueId = `size-${currentIndex}-${sizeSlug}`;
         label.setAttribute('for', uniqueId);
         label.textContent = size;
         const input = document.createElement('input');
@@ -595,6 +625,15 @@ openButton.addEventListener('click', () => {
 });
 
 section.addEventListener('change', (event) => {
+    if (event.target.name.startsWith('size-')) {
+        const figure = event.target.closest('figure');
+        if (!figure) return;
+        figure.dataset.size = event.target.value;
+        if (figure.dataset.pack === 'p1' && figure._updateFigure) {
+            figure._updateFigure(figure);
+        }
+        return;
+    }
     if (event.target.name.startsWith('pack-')) {
         const figure = event.target.closest('figure');
         if (!figure) return;
@@ -902,8 +941,12 @@ saveButton.addEventListener('click', async () => {
             const exportCanvasTemp = createTempCanvas();
             const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
                 ? figure._state
-                : mapGlobalToLocalState(pack, figure._state, figure._sourceImage);
-            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
+                : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
+            if (pack === 'p1') {
+                packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
+            } else {
+                packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
+            }
             exportCanvas = exportCanvasTemp;
         }
 
