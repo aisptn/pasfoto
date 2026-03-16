@@ -792,14 +792,22 @@ section.addEventListener('pointerdown', (event) => {
         }
     }
 
+    const rect = event.target.getBoundingClientRect();
+    const scaleX = rect.width ? (event.target.width / rect.width) : 1;
+    const scaleY = rect.height ? (event.target.height / rect.height) : 1;
+
     dragContext = {
         figure,
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
         originX: state.translateX,
         originY: state.translateY,
         subpack,
+        scaleX,
+        scaleY,
     };
 
     event.target.setPointerCapture(event.pointerId);
@@ -813,33 +821,37 @@ section.addEventListener('pointermove', (event) => {
     const state = figure._state;
     if (!state) return;
 
-    const dx = event.clientX - dragContext.startX;
-    const dy = event.clientY - dragContext.startY;
+    const dragScale = event.shiftKey ? 0.1 : 1;
+    const dx = (event.clientX - dragContext.lastX) * (dragContext.scaleX ?? 1) * dragScale;
+    const dy = (event.clientY - dragContext.lastY) * (dragContext.scaleY ?? 1) * dragScale;
 
     if ((figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') && dragContext.subpack) {
         if (dragContext.subpack === 'p1' || dragContext.subpack === 'p3') {
-            state.translateX = dragContext.originX + dx;
-            state.translateY = dragContext.originY + dy;
+            state.translateX += dx;
+            state.translateY += dy;
         } else if (dragContext.subpack === 'p2') {
-            const originLocal = mapP2GlobalToLocalState({ translateX: dragContext.originX, translateY: dragContext.originY, scale: state.scale });
+            const originLocal = mapP2GlobalToLocalState({ translateX: state.translateX, translateY: state.translateY, scale: state.scale });
             const movedLocal = { translateX: originLocal.translateX + dx, translateY: originLocal.translateY + dy, scale: state.scale };
             const newGlobal = mapLocalToGlobalState('p2', movedLocal);
             state.translateX = newGlobal.translateX;
             state.translateY = newGlobal.translateY;
         } else {
-            state.translateX = dragContext.originX + dx;
-            state.translateY = dragContext.originY + dy;
+            state.translateX += dx;
+            state.translateY += dy;
         }
     } else if (pack === 'p2') {
-        const originLocal = mapGlobalToLocalState('p2', { translateX: dragContext.originX, translateY: dragContext.originY, scale: state.scale }, figure._sourceImage);
+        const originLocal = mapGlobalToLocalState('p2', { translateX: state.translateX, translateY: state.translateY, scale: state.scale }, figure._sourceImage);
         const movedLocal = { translateX: originLocal.translateX + dx, translateY: originLocal.translateY + dy, scale: state.scale };
         const newGlobal = mapLocalToGlobalState('p2', movedLocal);
         state.translateX = newGlobal.translateX;
         state.translateY = newGlobal.translateY;
     } else {
-        state.translateX = dragContext.originX + dx;
-        state.translateY = dragContext.originY + dy;
+        state.translateX += dx;
+        state.translateY += dy;
     }
+
+    dragContext.lastX = event.clientX;
+    dragContext.lastY = event.clientY;
 
     clampFigureState(figure);
 
