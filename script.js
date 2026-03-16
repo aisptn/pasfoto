@@ -40,7 +40,7 @@ function mapGlobalToLocalState(pack, state, img, size) {
         return stateForPack('p1', normalized, img, baseSize);
     }
     if (pack === 'p2' || pack === 'p3' || pack === 'p7' || pack === 'p8' || pack === 'p9') {
-        return stateForPack(pack, normalized, img);
+        return stateForPack(pack, normalized, img, size);
     }
     return { translateX: state.translateX, translateY: state.translateY, scale: state.scale };
 }
@@ -80,9 +80,11 @@ function getPackLimits(pack, img, scale, size) {
     const horizontalPadding = cfg.hPad * mmToPx;
     const verticalPadding = cfg.vPad * mmToPx;
     const cols = (pack === 'p1' && size === 'regular') ? 3 : cfg.cols;
-    const rows = (pack === 'p1' && size === 'regular') ? 4 : cfg.rows;
+    const rows = (pack === 'p1' && size === 'regular') ? 4
+        : (pack === 'p2' && size === 'regular') ? 3 : cfg.rows;
     const cellCols = (pack === 'p1' && size === 'regular') ? cfg.cols : cols;
-    const cellRows = (pack === 'p1' && size === 'regular') ? cfg.rows : rows;
+    const cellRows = (pack === 'p1' && size === 'regular') ? cfg.rows
+        : (pack === 'p2' && size === 'regular') ? cfg.rows : rows;
     const aspectRatio = cfg.aspectRatio(img);
 
     let cellWidth = (finalWidth - horizontalPadding * (cellCols + 1)) / cellCols;
@@ -263,8 +265,25 @@ function p1(canvas, img, state, automapScale = 0.978, size = 'full pack') {
     renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false);
 }
 
-function p2(canvas, img, state, automapScale = 0.978) {
-    renderGrid(canvas, img, state, 2, 4, 4 * mmToPx, 3 * mmToPx, automapScale, true);
+function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+    const hPad = 4 * mmToPx;
+    const vPad = 3 * mmToPx;
+    const cols = 2;
+    const rows = size === 'regular' ? 3 : 4;
+    if (size === 'regular') {
+        const fullRows = 4;
+        const fullCellWidth = (finalWidth - hPad * (cols + 1)) / cols;
+        const fullCellHeight = (finalHeight - vPad * (fullRows + 1)) / fullRows;
+        const totalHeight = rows * fullCellHeight + (rows + 1) * vPad;
+        const offsetY = (finalHeight - totalHeight) / 2;
+        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, true, {
+            fixedCellWidth: fullCellWidth,
+            fixedCellHeight: fullCellHeight,
+            offsetY,
+        });
+        return;
+    }
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, true);
 }
 
 function p3(canvas, img, state, automapScale = 0.978) {
@@ -439,7 +458,7 @@ function updateFigure(figure) {
         const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
             ? figure._state
             : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, size);
-        if (pack === 'p1') {
+        if (pack === 'p1' || pack === 'p2') {
             renderer(c, figure._sourceImage, renderState, 0.978, size);
         } else {
             renderer(c, figure._sourceImage, renderState);
@@ -629,7 +648,7 @@ section.addEventListener('change', (event) => {
         const figure = event.target.closest('figure');
         if (!figure) return;
         figure.dataset.size = event.target.value;
-        if (figure.dataset.pack === 'p1' && figure._updateFigure) {
+        if ((figure.dataset.pack === 'p1' || figure.dataset.pack === 'p2') && figure._updateFigure) {
             figure._updateFigure(figure);
         }
         return;
@@ -942,7 +961,7 @@ saveButton.addEventListener('click', async () => {
             const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
                 ? figure._state
                 : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
-            if (pack === 'p1') {
+            if (pack === 'p1' || pack === 'p2') {
                 packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
             } else {
                 packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
