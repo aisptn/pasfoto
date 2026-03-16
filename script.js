@@ -14,7 +14,6 @@ const finalHeight = 1600;
 const mmToPx = 320 / 25.4;
 
 function getFigurePreviewSize() {
-    // figure width and height are defined in style.css; match those values dynamically
     const figure = document.querySelector('figure') || document.createElement('figure');
     const style = getComputedStyle(figure);
     const width = parseFloat(style.width) || 360;
@@ -431,20 +430,37 @@ function updateFigure(figure) {
     c.dataset.processed = '';
 }
 
-function addControls(figure, currentIndex) {
-    const sectionA = document.createElement('section');
-    const sectionB = document.createElement('section');
-    const fieldset = document.createElement('fieldset');
-
+function createRemoveButton() {
     const fileMenu = document.createElement('menu');
     const removeButton = document.createElement('input');
     removeButton.type = 'button';
     removeButton.value = 'remove';
     fileMenu.appendChild(removeButton);
-    sectionA.appendChild(fileMenu);
-    fieldset.appendChild(sectionA);
+    return fileMenu;
+}
 
+function createSizeOptions(currentIndex) {
+    const sizeMenu = document.createElement('menu');
+    ['regular', 'full pack'].forEach(size => {
+        const label = document.createElement('label');
+        const uniqueId = `size-${currentIndex}`;
+        label.setAttribute('for', uniqueId);
+        label.textContent = size;
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.id = uniqueId;
+        input.name = `size-${currentIndex}`;
+        input.value = size;
+        if (size === 'full pack') {
+            input.checked = true;
+        }
+        label.appendChild(input);
+        sizeMenu.appendChild(label);
+    });
+    return sizeMenu;
+}
 
+function createMoveButtons() {
     const moveMenu = document.createElement('menu');
     ['left', 'right', 'up', 'down'].forEach(direction => {
         const button = document.createElement('input');
@@ -456,10 +472,10 @@ function addControls(figure, currentIndex) {
         button.name = 'move';
         moveMenu.appendChild(button);
     });
+    return moveMenu;
+}
 
-    sectionA.appendChild(moveMenu);
-    fieldset.appendChild(sectionA);
-
+function createZoomButtons() {
     const zoomMenu = document.createElement('menu');
     ['zoom-out', 'zoom-in'].forEach(zoom => {
         const button = document.createElement('input');
@@ -469,10 +485,10 @@ function addControls(figure, currentIndex) {
         button.name = 'zoom';
         zoomMenu.appendChild(button);
     });
+    return zoomMenu;
+}
 
-    sectionA.appendChild(zoomMenu);
-    fieldset.appendChild(sectionA);
-
+function createPackOptions(currentIndex) { 
     const packMenu = document.createElement('menu');
     for (let i = 1; i <= 9; i++) {
         const label = document.createElement('label');
@@ -487,9 +503,24 @@ function addControls(figure, currentIndex) {
         label.appendChild(input);
         packMenu.appendChild(label);
     }
+    return packMenu;
+}
 
-    sectionB.appendChild(packMenu);
+
+function addControls(figure, currentIndex) {
+    const sectionA = document.createElement('section');
+    const sectionB = document.createElement('section');
+    const sectionC = document.createElement('section');
+    const fieldset = document.createElement('fieldset');
+
+    sectionA.appendChild(createRemoveButton());
+    sectionA.appendChild(createSizeOptions(currentIndex))
+    sectionB.appendChild(createPackOptions(currentIndex));
+    sectionC.appendChild(createMoveButtons());
+    sectionC.appendChild(createZoomButtons());
+    fieldset.appendChild(sectionA);
     fieldset.appendChild(sectionB);
+    fieldset.appendChild(sectionC);
     figure.appendChild(fieldset);
 }
 
@@ -522,6 +553,7 @@ function handleFiles(files) {
                 figure._previewSize = { width: targetWidth, height: targetHeight };
                 figure._state = { translateX: 0, translateY: 0, scale: 1 };
                 figure.dataset.pack = '';
+                figure.dataset.size = 'full pack';
                 figure.appendChild(canvas);
                 section.appendChild(figure);
 
@@ -563,12 +595,13 @@ openButton.addEventListener('click', () => {
 });
 
 section.addEventListener('change', (event) => {
-    if (!event.target.name.startsWith('pack-')) return;
-    const figure = event.target.closest('figure');
-    if (!figure) return;
-    figure.dataset.pack = event.target.value;
-    if (figure._updateFigure) {
-        figure._updateFigure(figure);
+    if (event.target.name.startsWith('pack-')) {
+        const figure = event.target.closest('figure');
+        if (!figure) return;
+        figure.dataset.pack = event.target.value;
+        if (figure._updateFigure) {
+            figure._updateFigure(figure);
+        }
     }
 });
 
@@ -910,3 +943,15 @@ function stateCheck() {
         clearButton.disabled = false;
     }
 }
+
+fetch('img.jpg')
+    .then(response => response.blob())
+    .then(blob => {
+        const file = new File([blob], 'img.jpg', { type: blob.type });
+        handleFiles([file]);
+    })
+    .catch(error => {
+        console.error('Error loading demo image:', error);
+    });
+
+stateCheck();
