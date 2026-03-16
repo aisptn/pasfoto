@@ -669,12 +669,20 @@ section.addEventListener('change', (event) => {
     }
 });
 
-function getMoveStep(figure, direction) {
+function getRelativeMoveStep(figure, direction, isFine) {
+    const pack = figure.dataset.pack;
+    const size = figure.dataset.size || 'full pack';
     const img = figure._sourceImage;
-    if (!img || !img.width || !img.height) return 15;
-    const step = direction === 'left' || direction === 'right'
-        ? img.width * 0.01
-        : img.height * 0.01;
+    const state = figure._state;
+    if (!img || !img.width || !img.height || !state) return 1;
+
+    const stepPct = isFine ? 0.01 : 0.10;
+    const effectivePack = packConfig[pack] ? pack : 'p1';
+    const limits = getPackLimits(effectivePack, img, state.scale, size);
+    const range = (direction === 'left' || direction === 'right')
+        ? limits.maxPanX
+        : limits.maxPanY;
+    const step = stepPct * range;
     return Math.max(1, Math.round(step));
 }
 
@@ -708,7 +716,7 @@ section.addEventListener('click', (event) => {
     if (event.target.name === 'move') {
         if (state.scale <= 1) return;
         const direction = event.target.className;
-        const moveStep = getMoveStep(figure, direction);
+        const moveStep = getRelativeMoveStep(figure, direction, event.shiftKey);
 
         if (pack === 'p2') {
             const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
