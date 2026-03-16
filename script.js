@@ -617,7 +617,6 @@ function handleFiles(files) {
                 updateFigure(figure);
             };
             img.src = event.target.result;
-            stateCheck();
         };
         reader.readAsDataURL(file);
     }
@@ -701,7 +700,6 @@ section.addEventListener('click', (event) => {
         const figure = event.target.closest('figure');
         if (figure) {
             figure.remove();
-            stateCheck();
         }
         return;
     }
@@ -947,24 +945,25 @@ function downloadBlob(blob, filename) {
 }
 
 saveButton.addEventListener('click', async () => {
-    const figures = section.querySelectorAll('figure');
+    const figures = Array.from(section.querySelectorAll('figure'))
+        .filter((figure) => packRenderers[figure.dataset.pack]);
     if (figures.length === 0) {
-        alert('No images to save!');
+        alert('No packed images to save!');
         return;
     }
 
     const packCounts = {};
     figures.forEach((figure) => {
-        const pack = figure.dataset.pack || 'image';
+        const pack = figure.dataset.pack;
         packCounts[pack] = (packCounts[pack] || 0) + 1;
     });
 
     const packIndices = {};
     const jobs = Array.from(figures).map((figure) => {
-        const pack = figure.dataset.pack || 'image';
+        const pack = figure.dataset.pack;
         const count = packCounts[pack] || 0;
 
-        let filenameBase = pack || 'image';
+        let filenameBase = pack;
         if (count > 1) {
             const occ = (packIndices[pack] || 0) + 1;
             packIndices[pack] = occ;
@@ -973,29 +972,17 @@ saveButton.addEventListener('click', async () => {
 
         const filename = `${filenameBase}.${writeFormats[currentFormatIndex]}`;
 
-        let exportCanvas = figure.querySelector('canvas');
-        if (pack === 'image') {
-            exportCanvas = createTempCanvas();
-            const ctx = exportCanvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, finalWidth, finalHeight);
-            ctx.drawImage(figure._sourceImage, 0, 0, finalWidth, finalHeight);
-        } else if (packRenderers[pack]) {
-            const exportCanvasTemp = createTempCanvas();
-            const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
-                ? figure._state
-                : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
-            if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
-                packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
-            } else {
-                packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
-            }
-            exportCanvas = exportCanvasTemp;
+        const exportCanvasTemp = createTempCanvas();
+        const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
+            ? figure._state
+            : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
+        if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
+            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
+        } else {
+            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
         }
 
-        return canvasToBlob(exportCanvas, `image/${writeFormats[currentFormatIndex]}`, quality)
+        return canvasToBlob(exportCanvasTemp, `image/${writeFormats[currentFormatIndex]}`, quality)
             .then((blob) => ({ blob, filename }));
     });
 
@@ -1015,31 +1002,24 @@ clearButton.addEventListener('click', () => {
         while (section.firstChild) {
             section.removeChild(section.firstChild);
         }
-        stateCheck();
     }
 });
 
-function stateCheck() {
-    const figureCount = section.querySelectorAll('figure').length;
-    if (figureCount === 0) {
-        description.style.display = 'block';
-        saveButton.disabled = true;
-        clearButton.disabled = true;
-    } else {
-        description.style.display = 'none';
-        saveButton.disabled = false;
-        clearButton.disabled = false;
-    }
-}
+let uiStateScheduled = false;
+const updateUiState = () => {
+    uiStateScheduled = false;
+    const hasFigures = section.querySelector('figure') !== null;
+    description.style.display = hasFigures ? 'none' : 'block';
+    saveButton.disabled = !hasFigures;
+    clearButton.disabled = !hasFigures;
+};
 
-fetch('img.jpg')
-    .then(response => response.blob())
-    .then(blob => {
-        const file = new File([blob], 'img.jpg', { type: blob.type });
-        handleFiles([file]);
-    })
-    .catch(error => {
-        console.error('Error loading demo image:', error);
-    });
+const scheduleUiStateUpdate = () => {
+    if (uiStateScheduled) return;
+    uiStateScheduled = true;
+    requestAnimationFrame(updateUiState);
+};
 
-stateCheck();
+const sectionObserver = new MutationObserver(scheduleUiStateUpdate);
+sectionObserver.observe(section, { childList: true });
+scheduleUiStateUpdate();
