@@ -318,34 +318,31 @@ function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
     ctx.drawImage(p2Canvas, 0, halfHeight, finalWidth, halfHeight, 0, halfHeight, finalWidth, halfHeight);
 }
 
-function p5(canvas, img, state, automapScale = 0.978, size = 'full pack') {
-    const normalized = normalizedStateFromPack('p1', state, img, size);
-    const p1State = stateForPack('p1', normalized, img, size);
-    const p3State = stateForPack('p3', normalized, img, 'full pack');
-
-    const tempCanvas = createTempCanvas();
-    const tempCtx = tempCanvas.getContext('2d');
-    p3(tempCanvas, img, p3State, automapScale);
-    const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p1(tempCanvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
-    const p1Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-
-    for (let i = 0; i < p1Data.data.length; i += 4) {
-        const y = Math.floor((i / 4) / finalWidth);
-        if (y < finalHeight / 2) {
-            p3Data.data[i] = p1Data.data[i];
-            p3Data.data[i + 1] = p1Data.data[i + 1];
-            p3Data.data[i + 2] = p1Data.data[i + 2];
-            p3Data.data[i + 3] = p1Data.data[i + 3];
-        }
-    }
-
+function compositeTopBottom(canvas, topCanvas, bottomCanvas) {
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.putImageData(p3Data, 0, 0);
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, finalWidth, finalHeight);
+
+    const halfHeight = finalHeight / 2;
+    ctx.drawImage(topCanvas, 0, 0, finalWidth, halfHeight, 0, 0, finalWidth, halfHeight);
+    ctx.drawImage(bottomCanvas, 0, halfHeight, finalWidth, halfHeight, 0, halfHeight, finalWidth, halfHeight);
+}
+
+function p5(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+    const normalized = normalizedStateFromPack('p1', state, img, size);
+    const p1State = stateForPack('p1', normalized, img, size);
+    const p3State = stateForPack('p3', normalized, img, 'full pack');
+
+    const p1Canvas = createTempCanvas();
+    const p3Canvas = createTempCanvas();
+    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
+    p3(p3Canvas, img, p3State, automapScale);
+
+    compositeTopBottom(canvas, p1Canvas, p3Canvas);
 }
 
 function p6(canvas, img, state, automapScale = 0.978) {
@@ -353,34 +350,17 @@ function p6(canvas, img, state, automapScale = 0.978) {
     const p2State = stateForPack('p2', normalized, img);
     const p3State = stateForPack('p3', normalized, img);
 
-    const tempCanvas = createTempCanvas();
-    const tempCtx = tempCanvas.getContext('2d');
-    p3(tempCanvas, img, p3State, automapScale);
-    const p3Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
-    p2(tempCanvas, img, p2State, automapScale);
-    const p2Data = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
+    const p2Canvas = createTempCanvas();
+    const p3Canvas = createTempCanvas();
+    p2(p2Canvas, img, p2State, automapScale);
+    p3(p3Canvas, img, p3State, automapScale);
 
-    for (let i = 0; i < p2Data.data.length; i += 4) {
-        const y = Math.floor((i / 4) / finalWidth);
-        if (y < finalHeight / 2) {
-            p3Data.data[i] = p2Data.data[i];
-            p3Data.data[i + 1] = p2Data.data[i + 1];
-            p3Data.data[i + 2] = p2Data.data[i + 2];
-            p3Data.data[i + 3] = p2Data.data[i + 3];
-        }
-    }
-
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.putImageData(p3Data, 0, 0);
+    compositeTopBottom(canvas, p2Canvas, p3Canvas);
 }
 
 function drawSmallPack(canvas, img, state, subWidth, subHeight) {
     const cols = 2;
-    const rows = (subHeight === 2 * 320 ? 2 : 2);
+    const rows = 2;
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
 
@@ -394,7 +374,6 @@ function drawSmallPack(canvas, img, state, subWidth, subHeight) {
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            if (canvas === undefined) continue;
             const x = col * cellWidth + (cellWidth - subWidth) / 2;
             const y = row * cellHeight + (cellHeight - subHeight) / 2;
             const xInt = Math.round(x);
@@ -717,16 +696,12 @@ section.addEventListener('click', (event) => {
         const moveStep = getRelativeMoveStep(figure, direction, event.shiftKey);
 
         if (pack === 'p2') {
-            const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
             switch (direction) {
-                case 'left': local.translateX -= moveStep; break;
-                case 'right': local.translateX += moveStep; break;
-                case 'up': local.translateY -= moveStep; break;
-                case 'down': local.translateY += moveStep; break;
+                case 'left': state.translateY += moveStep; break;
+                case 'right': state.translateY -= moveStep; break;
+                case 'up': state.translateX -= moveStep; break;
+                case 'down': state.translateX += moveStep; break;
             }
-            const global = mapLocalToGlobalState('p2', local);
-            state.translateX = global.translateX;
-            state.translateY = global.translateY;
         } else {
             switch (direction) {
                 case 'left': state.translateX -= moveStep; break;
@@ -736,25 +711,10 @@ section.addEventListener('click', (event) => {
             }
         }
     } else if (event.target.name === 'zoom') {
-        const oldScale = state.scale;
         if (event.target.className === 'zoom-in') {
             state.scale = Math.min(3, state.scale * 1.1);
         } else if (event.target.className === 'zoom-out') {
             state.scale = Math.max(1, state.scale / 1.1);
-        }
-        const scaleRatio = state.scale / oldScale;
-
-        if (pack === 'p2') {
-            const local = mapGlobalToLocalState('p2', state, figure._sourceImage);
-            local.translateX *= scaleRatio;
-            local.translateY *= scaleRatio;
-            const global = mapLocalToGlobalState('p2', local);
-            state.translateX = global.translateX;
-            state.translateY = global.translateY;
-            state.scale = local.scale;
-        } else {
-            state.translateX *= scaleRatio;
-            state.translateY *= scaleRatio;
         }
     }
 
@@ -828,21 +788,15 @@ section.addEventListener('pointermove', (event) => {
             state.translateX += dx;
             state.translateY += dy;
         } else if (dragContext.subpack === 'p2') {
-            const originLocal = mapP2GlobalToLocalState({ translateX: state.translateX, translateY: state.translateY, scale: state.scale });
-            const movedLocal = { translateX: originLocal.translateX + dx, translateY: originLocal.translateY + dy, scale: state.scale };
-            const newGlobal = mapLocalToGlobalState('p2', movedLocal);
-            state.translateX = newGlobal.translateX;
-            state.translateY = newGlobal.translateY;
+            state.translateX += dy;
+            state.translateY -= dx;
         } else {
             state.translateX += dx;
             state.translateY += dy;
         }
     } else if (pack === 'p2') {
-        const originLocal = mapGlobalToLocalState('p2', { translateX: state.translateX, translateY: state.translateY, scale: state.scale }, figure._sourceImage);
-        const movedLocal = { translateX: originLocal.translateX + dx, translateY: originLocal.translateY + dy, scale: state.scale };
-        const newGlobal = mapLocalToGlobalState('p2', movedLocal);
-        state.translateX = newGlobal.translateX;
-        state.translateY = newGlobal.translateY;
+        state.translateX += dy;
+        state.translateY -= dx;
     } else {
         state.translateX += dx;
         state.translateY += dy;
@@ -998,10 +952,9 @@ saveButton.addEventListener('click', async () => {
 });
 
 clearButton.addEventListener('click', () => {
-    if (section.children.length > 0 && confirm('Clear all images?')) {
-        while (section.firstChild) {
-            section.removeChild(section.firstChild);
-        }
+    const figures = section.querySelectorAll('figure');
+    if (figures.length > 0 && confirm('Clear all images?')) {
+        figures.forEach(f => f.remove());
     }
 });
 
@@ -1023,3 +976,14 @@ const scheduleUiStateUpdate = () => {
 const sectionObserver = new MutationObserver(scheduleUiStateUpdate);
 sectionObserver.observe(section, { childList: true });
 scheduleUiStateUpdate();
+
+//append img.jpg for quick testing
+fetch('img.jpg')
+    .then(response => response.blob())
+    .then(blob => { 
+        const file = new File([blob], 'img.jpg', { type: blob.type });
+        handleFiles([file]);
+    })
+    .catch(error => {
+        console.error('Error loading test image:', error);
+    });
