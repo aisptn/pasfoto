@@ -1123,12 +1123,12 @@ sectionObserver.observe(section, { childList: true });
 scheduleUiStateUpdate();
 
 //append img.jpg for quick testing
-fetch('img.jpg')
-    .then(response => response.blob())
-    .then(blob => { 
-        const file = new File([blob], 'img.jpg', { type: blob.type });
-        handleFiles([file]);
-    })
-    .catch(error => {
-        console.error('Error loading test image:', error);
-    });
+// fetch('img.jpg')
+//     .then(response => response.blob())
+//     .then(blob => { 
+//         const file = new File([blob], 'img.jpg', { type: blob.type });
+//         handleFiles([file]);
+//     })
+//     .catch(error => {
+//         console.error('Error loading test image:', error);
+//     });
