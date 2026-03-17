@@ -545,8 +545,9 @@ function createPackOptions(currentIndex) {
 function createTooltip() {
     const tooltip = document.createElement('p');
     const code = document.createElement('code');
-    tooltip.style.margin = '1rem 0 0.5rem 0';
+    tooltip.style.margin = '1rem 0 0 0';
     tooltip.style.fontSize = '0.75rem';
+    tooltip.style.fontStyle = 'italic';
     code.textContent = 'shift';
     code.style.background = 'white';
     code.style.color = 'black';
@@ -754,6 +755,75 @@ section.addEventListener('click', (event) => {
 });
 
 let dragContext = null;
+let pinchContext = null;
+
+function getCanvasPoint(event, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width ? (canvas.width / rect.width) : 1;
+    const scaleY = rect.height ? (canvas.height / rect.height) : 1;
+    return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY,
+    };
+}
+
+function getTouchDistance(a, b) {
+    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+}
+
+function getTouchMidpoint(a, b, canvas) {
+    const pointA = getCanvasPoint(a, canvas);
+    const pointB = getCanvasPoint(b, canvas);
+    return {
+        x: (pointA.x + pointB.x) / 2,
+        y: (pointA.y + pointB.y) / 2,
+    };
+}
+
+function applyPanDelta(figure, pack, dx, dy, subpack = null) {
+    const state = figure._state;
+    if (!state) return;
+
+    if ((figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') && subpack) {
+        if (subpack === 'p1' || subpack === 'p3') {
+            state.translateX += dx;
+            state.translateY += dy;
+        } else if (subpack === 'p2') {
+            state.translateX += dy;
+            state.translateY -= dx;
+        } else {
+            state.translateX += dx;
+            state.translateY += dy;
+        }
+    } else if (pack === 'p2') {
+        state.translateX += dy;
+        state.translateY -= dx;
+    } else {
+        state.translateX += dx;
+        state.translateY += dy;
+    }
+}
+
+function zoomFigureAtPoint(figure, scaleFactor, originX, originY) {
+    const state = figure._state;
+    if (!state) return;
+
+    const oldScale = state.scale;
+    const nextScale = clamp(oldScale * scaleFactor, minZoom, maxZoom);
+    const appliedFactor = nextScale / oldScale;
+    if (appliedFactor === 1) return;
+
+    state.translateX = (state.translateX - originX) * appliedFactor + originX;
+    state.translateY = (state.translateY - originY) * appliedFactor + originY;
+    state.scale = nextScale;
+}
+
+function panFigureToPoint(figure, fromPoint, toPoint) {
+    if (!fromPoint || !toPoint) return;
+    const dx = toPoint.x - fromPoint.x;
+    const dy = toPoint.y - fromPoint.y;
+    applyPanDelta(figure, figure.dataset.pack, dx, dy);
+}
 
 section.addEventListener('pointerdown', (event) => {
     if (!(event.target instanceof HTMLCanvasElement)) return;
@@ -766,6 +836,38 @@ section.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     event.preventDefault();
+
+    if (event.pointerType === 'touch') {
+        event.target.setPointerCapture(event.pointerId);
+        const existingTouches = pinchContext?.pointers ?? new Map();
+        const pointers = new Map(existingTouches);
+        pointers.set(event.pointerId, event);
+
+        if (pointers.size === 2) {
+            const [first, second] = Array.from(pointers.values());
+            pinchContext = {
+                figure,
+                canvas: event.target,
+                pointers,
+                startDistance: getTouchDistance(first, second),
+                midpoint: getTouchMidpoint(first, second, event.target),
+            };
+            dragContext = null;
+            return;
+        }
+
+        if (pointers.size > 2) {
+            pinchContext = {
+                ...(pinchContext ?? {}),
+                figure,
+                canvas: event.target,
+                pointers,
+            };
+            dragContext = null;
+            return;
+        }
+    }
+
     let subpack = null;
     if (figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') {
         const rect = event.target.getBoundingClientRect();
@@ -800,6 +902,32 @@ section.addEventListener('pointerdown', (event) => {
 });
 
 section.addEventListener('pointermove', (event) => {
+    if (pinchContext && pinchContext.pointers.has(event.pointerId)) {
+        pinchContext.pointers.set(event.pointerId, event);
+        if (pinchContext.pointers.size >= 2) {
+            const [first, second] = Array.from(pinchContext.pointers.values());
+            const distance = getTouchDistance(first, second);
+            const midpoint = getTouchMidpoint(first, second, pinchContext.canvas);
+            if (pinchContext.startDistance) {
+                const figure = pinchContext.figure;
+                panFigureToPoint(figure, pinchContext.midpoint, midpoint);
+                zoomFigureAtPoint(
+                    figure,
+                    distance / pinchContext.startDistance,
+                    midpoint.x,
+                    midpoint.y,
+                );
+                pinchContext.startDistance = distance;
+                pinchContext.midpoint = midpoint;
+                clampFigureState(figure);
+                if (figure._updateFigure) {
+                    figure._updateFigure(figure);
+                }
+            }
+        }
+        return;
+    }
+
     if (!dragContext || event.pointerId !== dragContext.pointerId) return;
     const figure = dragContext.figure;
     const pack = figure.dataset.pack;
@@ -811,24 +939,7 @@ section.addEventListener('pointermove', (event) => {
     const dx = (event.clientX - dragContext.lastX) * (dragContext.scaleX ?? 1) * dragScale;
     const dy = (event.clientY - dragContext.lastY) * (dragContext.scaleY ?? 1) * dragScale;
 
-    if ((figure.dataset.pack === 'p4' || figure.dataset.pack === 'p6') && dragContext.subpack) {
-        if (dragContext.subpack === 'p1' || dragContext.subpack === 'p3') {
-            state.translateX += dx;
-            state.translateY += dy;
-        } else if (dragContext.subpack === 'p2') {
-            state.translateX += dy;
-            state.translateY -= dx;
-        } else {
-            state.translateX += dx;
-            state.translateY += dy;
-        }
-    } else if (pack === 'p2') {
-        state.translateX += dy;
-        state.translateY -= dx;
-    } else {
-        state.translateX += dx;
-        state.translateY += dy;
-    }
+    applyPanDelta(figure, pack, dx, dy, dragContext.subpack);
 
     dragContext.lastX = event.clientX;
     dragContext.lastY = event.clientY;
@@ -841,6 +952,12 @@ section.addEventListener('pointermove', (event) => {
 });
 
 const endDrag = (event) => {
+    if (pinchContext?.pointers.has(event.pointerId)) {
+        pinchContext.pointers.delete(event.pointerId);
+        if (pinchContext.pointers.size < 2) {
+            pinchContext = null;
+        }
+    }
     if (!dragContext || event.pointerId !== dragContext.pointerId) return;
     const canvas = dragContext.figure.querySelector('canvas');
     if (canvas && canvas.releasePointerCapture) {
