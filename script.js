@@ -12,6 +12,8 @@ const writeFormats = ['jpeg', 'png', 'webp'];
 const finalWidth = 1120;
 const finalHeight = 1600;
 const mmToPx = 320 / 25.4;
+const minZoom = 1;
+const maxZoom = 10;
 
 function getFigurePreviewSize() {
     const figure = document.querySelector('figure') || document.createElement('figure');
@@ -145,7 +147,7 @@ function clampFigureState(figure) {
 
     state.translateX = clamped.translateX;
     state.translateY = clamped.translateY;
-    state.scale = Math.max(1, Math.min(3, state.scale));
+    state.scale = Math.max(minZoom, Math.min(maxZoom, state.scale));
 }
 
 function createTempCanvas() {
@@ -540,21 +542,41 @@ function createPackOptions(currentIndex) {
     return packMenu;
 }
 
+function createTooltip() {
+    const tooltip = document.createElement('p');
+    const code = document.createElement('code');
+    tooltip.style.margin = '1rem 0 0.5rem 0';
+    tooltip.style.fontSize = '0.75rem';
+    code.textContent = 'shift';
+    code.style.background = 'white';
+    code.style.color = 'black';
+    code.style.padding = '0.1rem 0.2rem';
+    code.style.border = '1px solid white';
+    tooltip.appendChild(document.createTextNode('tip: hold '));
+    tooltip.appendChild(code);
+    tooltip.appendChild(document.createTextNode(' for finer control'));
+    return tooltip;
+}
 
 function addControls(figure, currentIndex) {
     const sectionA = document.createElement('section');
     const sectionB = document.createElement('section');
     const sectionC = document.createElement('section');
+    const sectionD = document.createElement('section');
     const fieldset = document.createElement('fieldset');
+
+    fieldset.style.border = '0';
 
     sectionA.appendChild(createRemoveButton());
     sectionA.appendChild(createSizeOptions(currentIndex))
     sectionB.appendChild(createPackOptions(currentIndex));
     sectionC.appendChild(createMoveButtons());
     sectionC.appendChild(createZoomButtons());
+    sectionD.appendChild(createTooltip());
     fieldset.appendChild(sectionA);
     fieldset.appendChild(sectionB);
     fieldset.appendChild(sectionC);
+    fieldset.appendChild(sectionD);
     figure.appendChild(fieldset);
 }
 
@@ -691,7 +713,7 @@ section.addEventListener('click', (event) => {
     if (!state) return;
 
     if (event.target.name === 'move') {
-        if (state.scale <= 1) return;
+        if (state.scale <= minZoom) return;
         const direction = event.target.className;
         const moveStep = getRelativeMoveStep(figure, direction, event.shiftKey);
 
@@ -711,11 +733,17 @@ section.addEventListener('click', (event) => {
             }
         }
     } else if (event.target.name === 'zoom') {
+        const oldScale = state.scale;
+        const zoomRate = 1.1;
+        const zoomFactor = event.shiftKey ? Math.pow(zoomRate, 0.1) : zoomRate;
         if (event.target.className === 'zoom-in') {
-            state.scale = Math.min(3, state.scale * 1.1);
+            state.scale = Math.min(maxZoom, state.scale * zoomFactor);
         } else if (event.target.className === 'zoom-out') {
-            state.scale = Math.max(1, state.scale / 1.1);
+            state.scale = Math.max(minZoom, state.scale / zoomFactor);
         }
+        const scaleRatio = state.scale / oldScale;
+        state.translateX *= scaleRatio;
+        state.translateY *= scaleRatio;
     }
 
     clampFigureState(figure);
