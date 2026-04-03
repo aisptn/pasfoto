@@ -247,8 +247,9 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
 }
 
 function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align = 'center', alignPadPx) {
-    const hPad = 2 * mmToPx;
-    const vPad = 3 * mmToPx;
+    const cfg = packConfig.p1;
+    const hPad = cfg.hPad * mmToPx;
+    const vPad = cfg.vPad * mmToPx;
     const cols = size === 'regular' ? 3 : 4;
     const rows = 4;
     if (size === 'regular') {
@@ -274,8 +275,9 @@ function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align 
 }
 
 function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
-    const hPad = 4 * mmToPx;
-    const vPad = 3 * mmToPx;
+    const cfg = packConfig.p2;
+    const hPad = cfg.hPad * mmToPx;
+    const vPad = cfg.vPad * mmToPx;
     const cols = 2;
     const rows = size === 'regular' ? 3 : 4;
     if (size === 'regular') {
@@ -295,7 +297,10 @@ function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
 }
 
 function p3(canvas, img, state, automapScale = 0.978) {
-    renderGrid(canvas, img, state, 2, 2, 4 * mmToPx, 6 * mmToPx, automapScale, false);
+    const cfg = packConfig.p1;
+    const hPad = cfg.hPad * mmToPx;
+    const vPad = cfg.vPad * mmToPx;
+    renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, false);
 }
 
 function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
