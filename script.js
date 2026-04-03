@@ -297,7 +297,7 @@ function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
 }
 
 function p3(canvas, img, state, automapScale = 0.978) {
-    const cfg = packConfig.p1;
+    const cfg = packConfig.p3;
     const hPad = cfg.hPad * mmToPx;
     const vPad = cfg.vPad * mmToPx;
     renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, false);
