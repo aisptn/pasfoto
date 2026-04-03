@@ -60,7 +60,7 @@ function mapLocalToGlobalState(pack, state) {
 const packConfig = {
     p1: { hPad: 2, vPad: 3, cols: 4, rows: 4, aspectRatio: (img) => img.width / img.height },
     p2: { hPad: 4, vPad: 3, cols: 2, rows: 4, aspectRatio: (img) => img.height / img.width },
-    p3: { hPad: 4, vPad: 3, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
+    p3: { hPad: 4, vPad: 4, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
     p7: { hPad: 0, vPad: 0, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
     p8: { hPad: 0, vPad: 0, cols: 2, rows: 2, aspectRatio: (img) => img.width / img.height },
     p9: { hPad: 0, vPad: 0, cols: 1, rows: 2, aspectRatio: (img) => img.width / img.height },
