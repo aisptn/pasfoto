@@ -31,20 +31,22 @@ function mapP2GlobalToLocalState(state) {
     const globalX = state.translateX || 0;
     const globalY = state.translateY || 0;
     const scale = state.scale || 1;
-    return { translateX: -globalY, translateY: globalX, scale };
+    return { translateX: -globalY, translateY: globalX, scale, rotation: state.rotation || 0 };
 }
 
 function mapGlobalToLocalState(pack, state, img, size) {
-    if (!state) return { translateX: 0, translateY: 0, scale: 1 };
+    if (!state) return { translateX: 0, translateY: 0, scale: 1, rotation: 0 };
     const baseSize = pack === 'p1' ? size : 'full pack';
     const normalized = normalizedStateFromPack('p1', state, img, baseSize);
     if (pack === 'p1') {
-        return stateForPack('p1', normalized, img, baseSize);
+        const mapped = stateForPack('p1', normalized, img, baseSize);
+        return { ...mapped, rotation: state.rotation || 0 };
     }
     if (pack === 'p2' || pack === 'p3' || pack === 'p7' || pack === 'p8' || pack === 'p9') {
-        return stateForPack(pack, normalized, img, size);
+        const mapped = stateForPack(pack, normalized, img, size);
+        return { ...mapped, rotation: state.rotation || 0 };
     }
-    return { translateX: state.translateX, translateY: state.translateY, scale: state.scale };
+    return { translateX: state.translateX, translateY: state.translateY, scale: state.scale, rotation: state.rotation || 0 };
 }
 
 function mapLocalToGlobalState(pack, state) {
@@ -52,9 +54,9 @@ function mapLocalToGlobalState(pack, state) {
     const localY = state.translateY || 0;
     const scale = state.scale || 1;
     if (pack === 'p2') {
-        return { translateX: localY, translateY: -localX, scale };
+        return { translateX: localY, translateY: -localX, scale, rotation: state.rotation || 0 };
     }
-    return { translateX: localX, translateY: localY, scale };
+    return { translateX: localX, translateY: localY, scale, rotation: state.rotation || 0 };
 }
 
 const packConfig = {
@@ -114,6 +116,7 @@ function normalizedStateFromPack(basePack, state, img, size) {
         x: baseLimits.maxPanX ? clamp(state.translateX / baseLimits.maxPanX, -1, 1) : 0,
         y: baseLimits.maxPanY ? clamp(state.translateY / baseLimits.maxPanY, -1, 1) : 0,
         scale: state.scale,
+        rotation: state.rotation || 0,
     };
 }
 
@@ -124,6 +127,7 @@ function stateForPack(pack, normalized, img, size) {
             translateX: normalized.x * limits.maxPanY,
             translateY: normalized.y * limits.maxPanX,
             scale: normalized.scale,
+            rotation: normalized.rotation,
         };
         return mapP2GlobalToLocalState(rotated);
     }
@@ -131,6 +135,7 @@ function stateForPack(pack, normalized, img, size) {
         translateX: normalized.x * limits.maxPanX,
         translateY: normalized.y * limits.maxPanY,
         scale: normalized.scale,
+        rotation: normalized.rotation,
     };
 }
 
@@ -181,14 +186,14 @@ function drawImageBlock(ctx, img, x, y, cellWidth, cellHeight, state) {
     ctx.restore();
 }
 
-function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotate90 = false, options = {}) {
-    const useImg = rotate90 ? (() => {
+function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotation = 0, options = {}) {
+    const useImg = rotation !== 0 ? (() => {
         const rotated = document.createElement('canvas');
-        rotated.width = img.height;
-        rotated.height = img.width;
+        rotated.width = rotation === Math.PI / 2 || rotation === -Math.PI / 2 ? img.height : img.width;
+        rotated.height = rotation === Math.PI / 2 || rotation === -Math.PI / 2 ? img.width : img.height;
         const rotatedCtx = rotated.getContext('2d');
         rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-        rotatedCtx.rotate(Math.PI / 2);
+        rotatedCtx.rotate(rotation);
         rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
         return rotated;
     })() : img;
@@ -264,14 +269,14 @@ function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align 
         if (typeof alignPadPx === 'number') {
             offsetX = alignPadPx - hPad;
         }
-        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false, {
+        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, state.rotation || 0, {
             fixedCellWidth: fullCellWidth,
             fixedCellHeight: fullCellHeight,
             offsetX,
         });
         return;
     }
-    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, false);
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, state.rotation || 0);
 }
 
 function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
@@ -286,21 +291,21 @@ function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
         const fullCellHeight = (finalHeight - vPad * (fullRows + 1)) / fullRows;
         const totalHeight = rows * fullCellHeight + (rows + 1) * vPad;
         const offsetY = (finalHeight - totalHeight) / 2;
-        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, true, {
+        renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, (state.rotation || 0) + Math.PI / 2, {
             fixedCellWidth: fullCellWidth,
             fixedCellHeight: fullCellHeight,
             offsetY,
         });
         return;
     }
-    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, true);
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, (state.rotation || 0) + Math.PI / 2);
 }
 
 function p3(canvas, img, state, automapScale = 0.978) {
     const cfg = packConfig.p3;
     const hPad = cfg.hPad * mmToPx;
     const vPad = cfg.vPad * mmToPx;
-    renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, false);
+    renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, state.rotation || 0);
 }
 
 function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
@@ -371,6 +376,17 @@ function drawSmallPack(canvas, img, state, subWidth, subHeight) {
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
 
+    const useImg = (state.rotation || 0) !== 0 ? (() => {
+        const rotated = document.createElement('canvas');
+        rotated.width = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.height : img.width;
+        rotated.height = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.width : img.height;
+        const rotatedCtx = rotated.getContext('2d');
+        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
+        rotatedCtx.rotate(state.rotation);
+        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
+        return rotated;
+    })() : img;
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
@@ -387,7 +403,7 @@ function drawSmallPack(canvas, img, state, subWidth, subHeight) {
             const yInt = Math.round(y);
             const subWidthInt = Math.round(subWidth);
             const subHeightInt = Math.round(subHeight);
-            drawImageBlock(ctx, img, xInt, yInt, subWidthInt, subHeightInt, state);
+            drawImageBlock(ctx, useImg, xInt, yInt, subWidthInt, subHeightInt, state);
 
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
@@ -413,6 +429,17 @@ function p9(canvas, img, state) {
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
 
+    const useImg = (state.rotation || 0) !== 0 ? (() => {
+        const rotated = document.createElement('canvas');
+        rotated.width = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.height : img.width;
+        rotated.height = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.width : img.height;
+        const rotatedCtx = rotated.getContext('2d');
+        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
+        rotatedCtx.rotate(state.rotation);
+        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
+        return rotated;
+    })() : img;
+
     canvas.width = finalWidth;
     canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
@@ -432,7 +459,7 @@ function p9(canvas, img, state) {
         const wInt = Math.round(subWidth);
         const hInt = Math.round(subHeight);
 
-        drawImageBlock(ctx, img, xInt, yInt, wInt, hInt, state);
+        drawImageBlock(ctx, useImg, xInt, yInt, wInt, hInt, state);
         ctx.strokeRect(xInt + 0.5, yInt + 0.5, wInt, hInt);
     }
 }
@@ -461,12 +488,40 @@ function updateFigure(figure) {
 
     const previewWidth = figure._previewSize?.width ?? c.width;
     const previewHeight = figure._previewSize?.height ?? c.height;
+
+    const useImg = (figure._state.rotation || 0) !== 0 ? (() => {
+        const rotated = document.createElement('canvas');
+        rotated.width = figure._state.rotation === Math.PI / 2 || figure._state.rotation === -Math.PI / 2 ? figure._sourceImage.height : figure._sourceImage.width;
+        rotated.height = figure._state.rotation === Math.PI / 2 || figure._state.rotation === -Math.PI / 2 ? figure._sourceImage.width : figure._sourceImage.height;
+        const rotatedCtx = rotated.getContext('2d');
+        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
+        rotatedCtx.rotate(figure._state.rotation);
+        rotatedCtx.drawImage(figure._sourceImage, -figure._sourceImage.width / 2, -figure._sourceImage.height / 2);
+        return rotated;
+    })() : figure._sourceImage;
+
     c.width = previewWidth;
     c.height = previewHeight;
     const cctx = c.getContext('2d');
     cctx.fillStyle = 'white';
     cctx.fillRect(0, 0, previewWidth, previewHeight);
-    cctx.drawImage(figure._sourceImage, 0, 0, previewWidth, previewHeight);
+
+    // Scale to fit without stretching
+    const imgAspect = useImg.width / useImg.height;
+    const canvasAspect = previewWidth / previewHeight;
+    let drawWidth, drawHeight, offsetX, offsetY;
+    if (imgAspect > canvasAspect) {
+        drawWidth = previewWidth;
+        drawHeight = previewWidth / imgAspect;
+        offsetX = 0;
+        offsetY = (previewHeight - drawHeight) / 2;
+    } else {
+        drawHeight = previewHeight;
+        drawWidth = previewHeight * imgAspect;
+        offsetX = (previewWidth - drawWidth) / 2;
+        offsetY = 0;
+    }
+    cctx.drawImage(useImg, offsetX, offsetY, drawWidth, drawHeight);
     c.dataset.processed = '';
 }
 
@@ -537,6 +592,21 @@ function createZoomButtons() {
     return fieldset;
 }
 
+function createRotateButtons() {
+    const fieldset = document.createElement('fieldset');
+    const rotateMenu = document.createElement('menu');
+    ['rotate-left', 'rotate-right'].forEach(rotate => {
+        const button = document.createElement('input');
+        button.type = 'button';
+        button.value = rotate === 'rotate-left' ? '↺' : '↻';
+        button.className = rotate;
+        button.name = 'rotate';
+        rotateMenu.appendChild(button);
+    });
+    fieldset.append(rotateMenu);
+    return fieldset;
+}
+
 function createPackOptions(currentIndex) { 
     const fieldset = document.createElement('fieldset');
     const packMenu = document.createElement('menu');
@@ -588,6 +658,7 @@ function addControls(figure, currentIndex) {
     sectionB.appendChild(createPackOptions(currentIndex));
     sectionC.appendChild(createMoveButtons());
     sectionC.appendChild(createZoomButtons());
+    sectionC.appendChild(createRotateButtons());
     sectionD.appendChild(createTooltip());
     fieldset.appendChild(sectionA);
     fieldset.appendChild(sectionB);
@@ -623,7 +694,7 @@ function handleFiles(files) {
 
                 figure._sourceImage = img;
                 figure._previewSize = { width: targetWidth, height: targetHeight };
-                figure._state = { translateX: 0, translateY: 0, scale: 1 };
+                figure._state = { translateX: 0, translateY: 0, scale: 1, rotation: 0 };
                 figure.dataset.pack = '';
                 figure.dataset.size = 'regular';
                 figure.appendChild(canvas);
@@ -720,11 +791,11 @@ section.addEventListener('click', (event) => {
         }
         return;
     }
-    if (!(event.target.name === 'move' || event.target.name === 'zoom')) return;
+    if (!(event.target.name === 'move' || event.target.name === 'zoom' || event.target.name === 'rotate')) return;
     const figure = event.target.closest('figure');
     if (!figure) return;
     const pack = figure.dataset.pack;
-    if (!pack || !movablePacks.has(pack)) return;
+    if (event.target.name !== 'rotate' && (!pack || !movablePacks.has(pack))) return;
     const state = figure._state;
     if (!state) return;
 
@@ -760,8 +831,17 @@ section.addEventListener('click', (event) => {
         const scaleRatio = state.scale / oldScale;
         state.translateX *= scaleRatio;
         state.translateY *= scaleRatio;
+    } else if (event.target.name === 'rotate') {
+        const rotationStep = Math.PI / 2; // 90 degrees
+        if (event.target.className === 'rotate-left') {
+            state.rotation = (state.rotation || 0) - rotationStep;
+        } else if (event.target.className === 'rotate-right') {
+            state.rotation = (state.rotation || 0) + rotationStep;
+        }
+        // Normalize rotation to -2π to 2π
+        state.rotation = ((state.rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        if (state.rotation > Math.PI) state.rotation -= 2 * Math.PI;
     }
-
     clampFigureState(figure);
 
     if (figure._updateFigure) {
@@ -1136,14 +1216,3 @@ const scheduleUiStateUpdate = () => {
 const sectionObserver = new MutationObserver(scheduleUiStateUpdate);
 sectionObserver.observe(section, { childList: true });
 scheduleUiStateUpdate();
-
-//append img.jpg for quick testing
-// fetch('img.jpg')
-//     .then(response => response.blob())
-//     .then(blob => { 
-//         const file = new File([blob], 'img.jpg', { type: blob.type });
-//         handleFiles([file]);
-//     })
-//     .catch(error => {
-//         console.error('Error loading test image:', error);
-//     });
