@@ -764,13 +764,13 @@ function getRelativeMoveStep(figure, direction, isFine) {
     if (!img || !img.width || !img.height || !state) return 1;
 
     const stepPct = isFine ? 0.01 : 0.10;
-    const effectivePack = packConfig[pack] ? pack : 'p1';
-    const limits = getPackLimits(effectivePack, img, state.scale, size);
+    const baseSize = pack === 'p1' ? size : 'full pack';
+    const limits = getPackLimits('p1', img, state.scale, baseSize);
     const range = (direction === 'left' || direction === 'right')
         ? limits.maxPanX
         : limits.maxPanY;
     const step = stepPct * range;
-    return Math.max(1, Math.round(step));
+    return step;
 }
 
 function indexToAlphaSuffix(index) {
