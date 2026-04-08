@@ -34,14 +34,17 @@ section h1 {
     text-align: center;
 }
 figure {
-    /* border: 1px dashed gray; */
+    aspect-ratio: calc(sqrt(2)/2);
     display: flex;
+    flex: 0 1 512px;
     flex-direction: column;
     gap: 1rem;
-    height: 720px;
+    height: auto;
     margin: 1rem;
+    max-width: 512px;   
+    min-width: 0;
     padding: 1rem;
-    width: 512px;
+    width: 100%;
 }
 figure canvas {
     flex: 1;
