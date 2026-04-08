@@ -4,7 +4,7 @@ body {
     min-height: 100vh;
 }
 header {
-    background: black;
+    background: canvas;
     position: sticky;
     top: 0;
 }
@@ -13,11 +13,9 @@ nav {
     gap: 1rem;
     justify-content: center
 }
-nav ul {
+
+fieldset {
     display: flex;
-}
-nav ul li {
-    list-style: none;
 }
 main {
     display: flex;

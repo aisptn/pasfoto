@@ -6,7 +6,7 @@ const clearButton = document.getElementById('clear');
 const formatButton = document.getElementById('format');
 const qualityButton = document.getElementById('quality');
 
-const readFormats = ['image/avif', 'image/bmp', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
+const readFormats = ['image/*'];
 const writeFormats = ['jpeg', 'png', 'webp'];
 
 const finalWidth = 1120;
@@ -471,15 +471,18 @@ function updateFigure(figure) {
 }
 
 function createRemoveButton() {
+    const fieldset = document.createElement('fieldset');
     const fileMenu = document.createElement('menu');
     const removeButton = document.createElement('input');
     removeButton.type = 'button';
     removeButton.value = 'remove';
     fileMenu.appendChild(removeButton);
-    return fileMenu;
+    fieldset.append(fileMenu)
+    return fieldset;
 }
 
 function createSizeOptions(currentIndex) {
+    const fieldset = document.createElement('fieldset');
     const sizeMenu = document.createElement('menu');
     ['regular', 'full pack'].forEach(size => {
         const label = document.createElement('label');
@@ -498,10 +501,12 @@ function createSizeOptions(currentIndex) {
         label.appendChild(input);
         sizeMenu.appendChild(label);
     });
-    return sizeMenu;
+    fieldset.append(sizeMenu);
+    return fieldset;
 }
 
 function createMoveButtons() {
+    const fieldset = document.createElement('fieldset');
     const moveMenu = document.createElement('menu');
     ['left', 'right', 'up', 'down'].forEach(direction => {
         const button = document.createElement('input');
@@ -513,10 +518,12 @@ function createMoveButtons() {
         button.name = 'move';
         moveMenu.appendChild(button);
     });
-    return moveMenu;
+    fieldset.append(moveMenu)
+    return fieldset;
 }
 
 function createZoomButtons() {
+    const fieldset = document.createElement('fieldset');
     const zoomMenu = document.createElement('menu');
     ['zoom-out', 'zoom-in'].forEach(zoom => {
         const button = document.createElement('input');
@@ -526,10 +533,12 @@ function createZoomButtons() {
         button.name = 'zoom';
         zoomMenu.appendChild(button);
     });
-    return zoomMenu;
+    fieldset.append(zoomMenu)
+    return fieldset;
 }
 
 function createPackOptions(currentIndex) { 
+    const fieldset = document.createElement('fieldset');
     const packMenu = document.createElement('menu');
     for (let i = 1; i <= 9; i++) {
         const label = document.createElement('label');
@@ -544,7 +553,8 @@ function createPackOptions(currentIndex) {
         label.appendChild(input);
         packMenu.appendChild(label);
     }
-    return packMenu;
+    fieldset.append(packMenu)
+    return fieldset;
 }
 
 function createTooltip() {
@@ -554,10 +564,10 @@ function createTooltip() {
     tooltip.style.fontSize = '0.75rem';
     tooltip.style.fontStyle = 'italic';
     code.textContent = 'shift';
-    code.style.background = 'white';
-    code.style.color = 'black';
+    code.style.background = 'canvas';
+    code.style.color = 'canvasText';
+    code.style.filter = 'invert(1)'
     code.style.padding = '0.1rem 0.2rem';
-    code.style.border = '1px solid white';
     tooltip.appendChild(document.createTextNode('tip: hold '));
     tooltip.appendChild(code);
     tooltip.appendChild(document.createTextNode(' for finer control'));
