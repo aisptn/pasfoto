@@ -989,8 +989,6 @@ section.addEventListener('pointerdown', (event) => {
         originX: state.translateX,
         originY: state.translateY,
         subpack,
-        scaleX,
-        scaleY,
     };
 
     event.target.setPointerCapture(event.pointerId);
@@ -1031,8 +1029,8 @@ section.addEventListener('pointermove', (event) => {
     if (!state) return;
 
     const dragScale = event.shiftKey ? 0.1 : 1;
-    const dx = (event.clientX - dragContext.lastX) * (dragContext.scaleX ?? 1) * dragScale;
-    const dy = (event.clientY - dragContext.lastY) * (dragContext.scaleY ?? 1) * dragScale;
+    const dx = (event.clientX - dragContext.lastX) * dragScale;
+    const dy = (event.clientY - dragContext.lastY) * dragScale;
 
     applyPanDelta(figure, pack, dx, dy, dragContext.subpack);
 
