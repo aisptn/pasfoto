@@ -1,38 +1,37 @@
 ﻿# pasfoto
 
-A small browser-based passport photo layout tool that lets you import images, choose pack formats, crop/pan/zoom, and export arranged sheets as JPEG/PNG/WebP.
+A lightweight browser-based passport photo pack generator.
 
 ## Features
 
-- Drag-and-drop image import.
-- Multiple pack layouts (p1..p9) for passport or ID photo sheets.
-- Interactive touch/mouse pan + pinch-style controls via buttons.
-- Output format toggle: `jpeg`, `png`, `webp`.
-- Quality slider with mouse wheel / clicks.
-- Save individually generated sheets and clear session.
+- Drag and drop images or open them using the `open` button.
+- Build printable passport photo packs in multiple layouts: `p1` through `p9`.
+- Choose between regular and full pack sizes.
+- Pan, zoom, rotate, and fine-tune the photo position in the preview canvas.
+- Export final images as `jpeg`, `png`, or `webp` with adjustable quality.
+- Save directly using the browser download flow or the directory picker when supported.
 
-## How to use
+## Files
 
-1. Open `index.html` in a modern browser (Chrome/Edge/Firefox/Safari).
-2. Drag images into the center area or click **open** to select files.
-3. For each image card:
-   - Use `p1..p9` to select the output pack layout.
-   - Use arrow move buttons and zoom buttons to adjust framing.
-   - Drag directly in the canvas to pan the crop area.
-4. Choose output format by clicking **format** (cycles through JPG/PNG/WebP).
-5. Adjust quality with **quality** (+/- or mouse wheel; disabled for PNG).
-6. Click **save** to download images in selected format.
-7. Click **clear** to reset.
+- `index.html` — app shell and layout.
+- `style.css` — minimal responsive styling.
+- `core.js` — pack rendering, image processing, and state management.
+- `script.js` — UI controls, drag/drop, export, and interaction logic.
+- `LICENSE` — MIT license.
 
-## Supported input image formats
+## Usage
 
-- AVIF, BMP, GIF, ICO, JPEG, PNG, SVG, WebP
+1. Open `index.html` in a modern browser.
+2. Drag and drop a photo onto the page, or click `open`.
+3. Use the controls to change the pack type, size, movement, zoom, and rotation.
+4. Adjust `format` and `quality` before saving.
+5. Click `save` to export the passport photo pack.
 
 ## Notes
 
-- The app is zero-dependency JavaScript embedded in a single `index.html`.
-- Recommended for local use; use via HTTP server if browser blocks local file access.
+- The app expects sRGB images. Convert non-sRGB images first for best results.
+- For best compatibility, use a modern Chromium-based browser.
 
 ## License
 
-MIT
+This project is licensed under the MIT License. See `LICENSE`.
