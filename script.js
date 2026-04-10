@@ -14,6 +14,8 @@ const finalHeight = 1600;
 const mmToPx = 320 / 25.4;
 const minZoom = 1;
 const maxZoom = 10;
+const defaultAutomapScale = 0.978;
+const previewSourceMaxDimension = 1600;
 
 function getFigurePreviewSize() {
     const figure = document.querySelector('figure') || document.createElement('figure');
@@ -25,6 +27,97 @@ function getFigurePreviewSize() {
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+function createCanvas(width = finalWidth, height = finalHeight) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+}
+
+function normalizeRotation(rotation = 0) {
+    const normalized = ((rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    return normalized > Math.PI ? normalized - 2 * Math.PI : normalized;
+}
+
+function getRotationCache(figure) {
+    if (!figure._rotationCache) {
+        figure._rotationCache = new Map();
+    }
+    return figure._rotationCache;
+}
+
+function getRotatedImage(source, rotation, figure = null) {
+    const normalizedRotation = normalizeRotation(rotation);
+    if (!normalizedRotation) return source;
+
+    const cache = figure ? getRotationCache(figure) : null;
+    const cacheKey = `${source.width}x${source.height}:${normalizedRotation}`;
+    const cached = cache?.get(cacheKey);
+    if (cached) return cached;
+
+    const isQuarterTurn = Math.abs(Math.abs(normalizedRotation) - (Math.PI / 2)) < 0.0001;
+    const rotated = createCanvas(
+        isQuarterTurn ? source.height : source.width,
+        isQuarterTurn ? source.width : source.height,
+    );
+    const rotatedCtx = rotated.getContext('2d');
+    rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
+    rotatedCtx.rotate(normalizedRotation);
+    rotatedCtx.drawImage(source, -source.width / 2, -source.height / 2);
+
+    cache?.set(cacheKey, rotated);
+    return rotated;
+}
+
+function createPreviewImage(source) {
+    const longestEdge = Math.max(source.width, source.height);
+    if (longestEdge <= previewSourceMaxDimension) {
+        return source;
+    }
+
+    const scale = previewSourceMaxDimension / longestEdge;
+    const previewCanvas = createCanvas(
+        Math.max(1, Math.round(source.width * scale)),
+        Math.max(1, Math.round(source.height * scale)),
+    );
+    const previewCtx = previewCanvas.getContext('2d');
+    previewCtx.imageSmoothingEnabled = true;
+    previewCtx.imageSmoothingQuality = 'high';
+    previewCtx.drawImage(source, 0, 0, previewCanvas.width, previewCanvas.height);
+    return previewCanvas;
+}
+
+function getFigureRenderImage(figure, mode = 'preview') {
+    return mode === 'export' ? figure._sourceImage : (figure._previewImage || figure._sourceImage);
+}
+
+function getWorkingCanvas(figure, key, width = finalWidth, height = finalHeight) {
+    if (!figure._workCanvases) {
+        figure._workCanvases = new Map();
+    }
+
+    let canvas = figure._workCanvases.get(key);
+    if (!canvas) {
+        canvas = createCanvas(width, height);
+        figure._workCanvases.set(key, canvas);
+        return canvas;
+    }
+
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+    return canvas;
+}
+
+function disposeFigureResources(figure) {
+    if (!figure) return;
+    if (figure._objectUrl) {
+        URL.revokeObjectURL(figure._objectUrl);
+        figure._objectUrl = null;
+    }
+    figure._rotationCache?.clear();
+    figure._workCanvases?.clear();
 }
 
 function mapP2GlobalToLocalState(state) {
@@ -156,10 +249,7 @@ function clampFigureState(figure) {
 }
 
 function createTempCanvas() {
-    const canvas = document.createElement('canvas');
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
-    return canvas;
+    return createCanvas(finalWidth, finalHeight);
 }
 
 function drawImageBlock(ctx, img, x, y, cellWidth, cellHeight, state) {
@@ -186,24 +276,15 @@ function drawImageBlock(ctx, img, x, y, cellWidth, cellHeight, state) {
     ctx.restore();
 }
 
-function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0.978, rotation = 0, options = {}) {
-    const useImg = rotation !== 0 ? (() => {
-        const rotated = document.createElement('canvas');
-        rotated.width = rotation === Math.PI / 2 || rotation === -Math.PI / 2 ? img.height : img.width;
-        rotated.height = rotation === Math.PI / 2 || rotation === -Math.PI / 2 ? img.width : img.height;
-        const rotatedCtx = rotated.getContext('2d');
-        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-        rotatedCtx.rotate(rotation);
-        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
-        return rotated;
-    })() : img;
+function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = defaultAutomapScale, rotation = 0, options = {}) {
+    const useImg = getRotatedImage(img, rotation, options.figure);
 
     const cellWidth = options.fixedCellWidth ?? ((finalWidth - hPad * (cols + 1)) / cols);
     const cellHeight = options.fixedCellHeight ?? ((finalHeight - vPad * (rows + 1)) / rows);
     const baseOffsetX = options.offsetX ?? 0;
     const baseOffsetY = options.offsetY ?? 0;
 
-    const tempCanvas = createTempCanvas();
+    const tempCanvas = options.tempCanvas || createTempCanvas();
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.imageSmoothingEnabled = true;
     tempCtx.imageSmoothingQuality = 'high';
@@ -251,7 +332,7 @@ function renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale = 0
     }
 }
 
-function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align = 'center', alignPadPx) {
+function p1(canvas, img, state, automapScale = defaultAutomapScale, size = 'full pack', align = 'center', alignPadPx, options = {}) {
     const cfg = packConfig.p1;
     const hPad = cfg.hPad * mmToPx;
     const vPad = cfg.vPad * mmToPx;
@@ -273,13 +354,14 @@ function p1(canvas, img, state, automapScale = 0.978, size = 'full pack', align 
             fixedCellWidth: fullCellWidth,
             fixedCellHeight: fullCellHeight,
             offsetX,
+            ...options,
         });
         return;
     }
-    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, state.rotation || 0);
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, state.rotation || 0, options);
 }
 
-function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+function p2(canvas, img, state, automapScale = defaultAutomapScale, size = 'full pack', options = {}) {
     const cfg = packConfig.p2;
     const hPad = cfg.hPad * mmToPx;
     const vPad = cfg.vPad * mmToPx;
@@ -295,28 +377,29 @@ function p2(canvas, img, state, automapScale = 0.978, size = 'full pack') {
             fixedCellWidth: fullCellWidth,
             fixedCellHeight: fullCellHeight,
             offsetY,
+            ...options,
         });
         return;
     }
-    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, (state.rotation || 0) + Math.PI / 2);
+    renderGrid(canvas, img, state, cols, rows, hPad, vPad, automapScale, (state.rotation || 0) + Math.PI / 2, options);
 }
 
-function p3(canvas, img, state, automapScale = 0.978) {
+function p3(canvas, img, state, automapScale = defaultAutomapScale, options = {}) {
     const cfg = packConfig.p3;
     const hPad = cfg.hPad * mmToPx;
     const vPad = cfg.vPad * mmToPx;
-    renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, state.rotation || 0);
+    renderGrid(canvas, img, state, 2, 2, hPad, vPad, automapScale, state.rotation || 0, options);
 }
 
-function p4(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+function p4(canvas, img, state, automapScale = defaultAutomapScale, size = 'full pack', options = {}) {
     const normalized = normalizedStateFromPack('p1', state, img, size);
     const p1State = stateForPack('p1', normalized, img, size);
     const p2State = stateForPack('p2', normalized, img, 'full pack');
 
-    const p1Canvas = createTempCanvas();
-    const p2Canvas = createTempCanvas();
-    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
-    p2(p2Canvas, img, p2State, automapScale);
+    const p1Canvas = options.figure ? getWorkingCanvas(options.figure, 'p4-p1') : createTempCanvas();
+    const p2Canvas = options.figure ? getWorkingCanvas(options.figure, 'p4-p2') : createTempCanvas();
+    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx, options);
+    p2(p2Canvas, img, p2State, automapScale, 'full pack', options);
 
     canvas.width = finalWidth;
     canvas.height = finalHeight;
@@ -344,28 +427,28 @@ function compositeTopBottom(canvas, topCanvas, bottomCanvas) {
     ctx.drawImage(bottomCanvas, 0, halfHeight, finalWidth, halfHeight, 0, halfHeight, finalWidth, halfHeight);
 }
 
-function p5(canvas, img, state, automapScale = 0.978, size = 'full pack') {
+function p5(canvas, img, state, automapScale = defaultAutomapScale, size = 'full pack', options = {}) {
     const normalized = normalizedStateFromPack('p1', state, img, size);
     const p1State = stateForPack('p1', normalized, img, size);
     const p3State = stateForPack('p3', normalized, img, 'full pack');
 
-    const p1Canvas = createTempCanvas();
-    const p3Canvas = createTempCanvas();
-    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx);
-    p3(p3Canvas, img, p3State, automapScale);
+    const p1Canvas = options.figure ? getWorkingCanvas(options.figure, 'p5-p1') : createTempCanvas();
+    const p3Canvas = options.figure ? getWorkingCanvas(options.figure, 'p5-p3') : createTempCanvas();
+    p1(p1Canvas, img, p1State, automapScale, size, 'left', 4 * mmToPx, options);
+    p3(p3Canvas, img, p3State, automapScale, options);
 
     compositeTopBottom(canvas, p1Canvas, p3Canvas);
 }
 
-function p6(canvas, img, state, automapScale = 0.978) {
+function p6(canvas, img, state, automapScale = defaultAutomapScale, options = {}) {
     const normalized = normalizedStateFromPack('p1', state, img);
     const p2State = stateForPack('p2', normalized, img);
     const p3State = stateForPack('p3', normalized, img);
 
-    const p2Canvas = createTempCanvas();
-    const p3Canvas = createTempCanvas();
-    p2(p2Canvas, img, p2State, automapScale);
-    p3(p3Canvas, img, p3State, automapScale);
+    const p2Canvas = options.figure ? getWorkingCanvas(options.figure, 'p6-p2') : createTempCanvas();
+    const p3Canvas = options.figure ? getWorkingCanvas(options.figure, 'p6-p3') : createTempCanvas();
+    p2(p2Canvas, img, p2State, automapScale, 'full pack', options);
+    p3(p3Canvas, img, p3State, automapScale, options);
 
     compositeTopBottom(canvas, p2Canvas, p3Canvas);
 }
@@ -376,16 +459,7 @@ function drawSmallPack(canvas, img, state, subWidth, subHeight) {
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
 
-    const useImg = (state.rotation || 0) !== 0 ? (() => {
-        const rotated = document.createElement('canvas');
-        rotated.width = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.height : img.width;
-        rotated.height = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.width : img.height;
-        const rotatedCtx = rotated.getContext('2d');
-        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-        rotatedCtx.rotate(state.rotation);
-        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
-        return rotated;
-    })() : img;
+    const useImg = getRotatedImage(img, state.rotation || 0, canvas.closest('figure'));
 
     canvas.width = finalWidth;
     canvas.height = finalHeight;
@@ -429,16 +503,7 @@ function p9(canvas, img, state) {
     const cellWidth = finalWidth / cols;
     const cellHeight = finalHeight / rows;
 
-    const useImg = (state.rotation || 0) !== 0 ? (() => {
-        const rotated = document.createElement('canvas');
-        rotated.width = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.height : img.width;
-        rotated.height = state.rotation === Math.PI / 2 || state.rotation === -Math.PI / 2 ? img.width : img.height;
-        const rotatedCtx = rotated.getContext('2d');
-        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-        rotatedCtx.rotate(state.rotation);
-        rotatedCtx.drawImage(img, -img.width / 2, -img.height / 2);
-        return rotated;
-    })() : img;
+    const useImg = getRotatedImage(img, state.rotation || 0, canvas.closest('figure'));
 
     canvas.width = finalWidth;
     canvas.height = finalHeight;
@@ -467,20 +532,21 @@ function p9(canvas, img, state) {
 const packRenderers = { p1, p2, p3, p4, p5, p6, p7, p8, p9 };
 const movablePacks = new Set(Object.keys(packRenderers));
 
-function updateFigure(figure) {
-    const c = figure.querySelector('canvas');
+function renderFigureNow(figure, mode = 'preview') {
+    const c = figure._canvas || figure.querySelector('canvas');
     if (!c) return;
     const pack = figure.dataset.pack;
     const size = figure.dataset.size || 'full pack';
     const renderer = packRenderers[pack];
+    const renderImage = getFigureRenderImage(figure, mode);
     if (typeof renderer === 'function') {
         const renderState = (pack === 'p4' || pack === 'p5' || pack === 'p6')
             ? figure._state
-            : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, size);
+            : mapGlobalToLocalState(pack, figure._state, renderImage, size);
         if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
-            renderer(c, figure._sourceImage, renderState, 0.978, size);
+            renderer(c, renderImage, renderState, defaultAutomapScale, size, undefined, undefined, { figure });
         } else {
-            renderer(c, figure._sourceImage, renderState);
+            renderer(c, renderImage, renderState, defaultAutomapScale, { figure });
         }
         c.dataset.processed = pack;
         return;
@@ -488,21 +554,12 @@ function updateFigure(figure) {
 
     const previewWidth = figure._previewSize?.width ?? c.width;
     const previewHeight = figure._previewSize?.height ?? c.height;
-
-    const useImg = (figure._state.rotation || 0) !== 0 ? (() => {
-        const rotated = document.createElement('canvas');
-        rotated.width = figure._state.rotation === Math.PI / 2 || figure._state.rotation === -Math.PI / 2 ? figure._sourceImage.height : figure._sourceImage.width;
-        rotated.height = figure._state.rotation === Math.PI / 2 || figure._state.rotation === -Math.PI / 2 ? figure._sourceImage.width : figure._sourceImage.height;
-        const rotatedCtx = rotated.getContext('2d');
-        rotatedCtx.translate(rotated.width / 2, rotated.height / 2);
-        rotatedCtx.rotate(figure._state.rotation);
-        rotatedCtx.drawImage(figure._sourceImage, -figure._sourceImage.width / 2, -figure._sourceImage.height / 2);
-        return rotated;
-    })() : figure._sourceImage;
+    const useImg = getRotatedImage(renderImage, figure._state.rotation || 0, figure);
 
     c.width = previewWidth;
     c.height = previewHeight;
-    const cctx = c.getContext('2d');
+    const cctx = figure._context || c.getContext('2d');
+    figure._context = cctx;
     cctx.fillStyle = 'white';
     cctx.fillRect(0, 0, previewWidth, previewHeight);
 
@@ -523,6 +580,16 @@ function updateFigure(figure) {
     }
     cctx.drawImage(useImg, offsetX, offsetY, drawWidth, drawHeight);
     c.dataset.processed = '';
+}
+
+function updateFigure(figure) {
+    if (!figure || figure._renderScheduled) return;
+    figure._renderScheduled = true;
+    requestAnimationFrame(() => {
+        figure._renderScheduled = false;
+        if (!figure.isConnected) return;
+        renderFigureNow(figure, 'preview');
+    });
 }
 
 function createRemoveButton() {
@@ -671,42 +738,45 @@ let figureCount = 0;
 
 function handleFiles(files) {
     for (const file of files) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const currentIndex = figureCount++;
-                const aspectRatio = img.width / img.height;
-                const { width: defaultWidth, height: maxHeight } = getFigurePreviewSize();
-                let targetWidth = defaultWidth;
-                let targetHeight = targetWidth / aspectRatio;
-                if (targetHeight > maxHeight) {
-                    targetHeight = maxHeight;
-                    targetWidth = targetHeight * aspectRatio;
-                }
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => {
+            const currentIndex = figureCount++;
+            const aspectRatio = img.width / img.height;
+            const { width: defaultWidth, height: maxHeight } = getFigurePreviewSize();
+            let targetWidth = defaultWidth;
+            let targetHeight = targetWidth / aspectRatio;
+            if (targetHeight > maxHeight) {
+                targetHeight = maxHeight;
+                targetWidth = targetHeight * aspectRatio;
+            }
 
-                const figure = document.createElement('figure');
-                const canvas = document.createElement('canvas');
-                canvas.width = targetWidth;
-                canvas.height = targetHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const figure = document.createElement('figure');
+            const canvas = createCanvas(targetWidth, targetHeight);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                figure._sourceImage = img;
-                figure._previewSize = { width: targetWidth, height: targetHeight };
-                figure._state = { translateX: 0, translateY: 0, scale: 1, rotation: 0 };
-                figure.dataset.pack = '';
-                figure.dataset.size = 'regular';
-                figure.appendChild(canvas);
-                section.appendChild(figure);
+            figure._sourceImage = img;
+            figure._previewImage = createPreviewImage(img);
+            figure._previewSize = { width: targetWidth, height: targetHeight };
+            figure._state = { translateX: 0, translateY: 0, scale: 1, rotation: 0 };
+            figure._canvas = canvas;
+            figure._context = ctx;
+            figure.dataset.pack = '';
+            figure.dataset.size = 'regular';
+            figure.appendChild(canvas);
+            section.appendChild(figure);
 
-                addControls(figure, currentIndex);
-                figure._updateFigure = updateFigure;
-                updateFigure(figure);
-            };
-            img.src = event.target.result;
+            addControls(figure, currentIndex);
+            figure._updateFigure = updateFigure;
+            renderFigureNow(figure, 'preview');
+            URL.revokeObjectURL(objectUrl);
         };
-        reader.readAsDataURL(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+        };
+        img.src = objectUrl;
     }
 }
 
@@ -787,6 +857,7 @@ section.addEventListener('click', (event) => {
     if (event.target.type === 'button' && event.target.value === 'remove') {
         const figure = event.target.closest('figure');
         if (figure) {
+            disposeFigureResources(figure);
             figure.remove();
         }
         return;
@@ -1151,7 +1222,7 @@ saveButton.addEventListener('click', async () => {
     });
 
     const packIndices = {};
-    const jobs = Array.from(figures).map((figure) => {
+    const jobs = Array.from(figures).map((figure) => async () => {
         const pack = figure.dataset.pack;
         const count = packCounts[pack] || 0;
 
@@ -1169,17 +1240,20 @@ saveButton.addEventListener('click', async () => {
             ? figure._state
             : mapGlobalToLocalState(pack, figure._state, figure._sourceImage, figure.dataset.size);
         if (pack === 'p1' || pack === 'p2' || pack === 'p4' || pack === 'p5') {
-            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size);
+            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, figure.dataset.size, undefined, undefined, {});
         } else {
-            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1);
+            packRenderers[pack](exportCanvasTemp, figure._sourceImage, renderState, 1, {});
         }
 
-        return canvasToBlob(exportCanvasTemp, `image/${writeFormats[currentFormatIndex]}`, quality)
-            .then((blob) => ({ blob, filename }));
+        const blob = await canvasToBlob(exportCanvasTemp, `image/${writeFormats[currentFormatIndex]}`, quality);
+        return { blob, filename };
     });
 
     try {
-        const results = await Promise.all(jobs);
+        const results = [];
+        for (const job of jobs) {
+            results.push(await job());
+        }
         results.forEach(({ blob, filename }) => {
             downloadBlob(blob, filename);
         });
@@ -1192,7 +1266,10 @@ saveButton.addEventListener('click', async () => {
 clearButton.addEventListener('click', () => {
     const figures = section.querySelectorAll('figure');
     if (figures.length > 0 && confirm('Clear all images?')) {
-        figures.forEach(f => f.remove());
+        figures.forEach((figure) => {
+            disposeFigureResources(figure);
+            figure.remove();
+        });
     }
 });
 
