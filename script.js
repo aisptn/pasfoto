@@ -9,6 +9,9 @@ const qualityButton = document.getElementById('quality');
 const readFormats = ['image/*'];
 const writeFormats = ['jpeg', 'png', 'webp'];
 
+const supportsDirectoryPicker = typeof window.showDirectoryPicker === 'function';
+const maxDirectDownloads = 10;
+
 const finalWidth = 1120;
 const finalHeight = 1600;
 const mmToPx = 320 / 25.4;
@@ -563,7 +566,7 @@ function renderFigureNow(figure, mode = 'preview') {
     cctx.fillStyle = 'white';
     cctx.fillRect(0, 0, previewWidth, previewHeight);
 
-    // Scale to fit without stretching
+    
     const imgAspect = useImg.width / useImg.height;
     const canvasAspect = previewWidth / previewHeight;
     let drawWidth, drawHeight, offsetX, offsetY;
@@ -737,7 +740,20 @@ function addControls(figure, currentIndex) {
 let figureCount = 0;
 
 function handleFiles(files) {
+    const currentFigureCount = section.querySelectorAll('figure').length;
+    
+    if (!supportsDirectoryPicker && currentFigureCount >= maxDirectDownloads) {
+        alert(`Maximum ${maxDirectDownloads} images allowed (File System API not available). Clear some to add more.`);
+        return;
+    }
+
     for (const file of files) {
+        const currentCount = section.querySelectorAll('figure').length;
+        if (!supportsDirectoryPicker && currentCount >= maxDirectDownloads) {
+            alert(`Cannot add more than ${maxDirectDownloads} images.`);
+            break;
+        }
+
         const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.decoding = 'async';
@@ -903,13 +919,13 @@ section.addEventListener('click', (event) => {
         state.translateX *= scaleRatio;
         state.translateY *= scaleRatio;
     } else if (event.target.name === 'rotate') {
-        const rotationStep = Math.PI / 2; // 90 degrees
+        const rotationStep = Math.PI / 2; 
         if (event.target.className === 'rotate-left') {
             state.rotation = (state.rotation || 0) - rotationStep;
         } else if (event.target.className === 'rotate-right') {
             state.rotation = (state.rotation || 0) + rotationStep;
         }
-        // Normalize rotation to -2π to 2π
+        
         state.rotation = ((state.rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         if (state.rotation > Math.PI) state.rotation -= 2 * Math.PI;
     }
@@ -1207,22 +1223,8 @@ function downloadBlob(blob, filename) {
     URL.revokeObjectURL(a.href);
 }
 
-saveButton.addEventListener('click', async () => {
-    const figures = Array.from(section.querySelectorAll('figure'))
-        .filter((figure) => packRenderers[figure.dataset.pack]);
-    if (figures.length === 0) {
-        alert('No packed images to save!');
-        return;
-    }
-
-    const packCounts = {};
-    figures.forEach((figure) => {
-        const pack = figure.dataset.pack;
-        packCounts[pack] = (packCounts[pack] || 0) + 1;
-    });
-
-    const packIndices = {};
-    const jobs = Array.from(figures).map((figure) => async () => {
+function createExportJob(figure, packCounts, packIndices) {
+    return async () => {
         const pack = figure.dataset.pack;
         const count = packCounts[pack] || 0;
 
@@ -1247,16 +1249,79 @@ saveButton.addEventListener('click', async () => {
 
         const blob = await canvasToBlob(exportCanvasTemp, `image/${writeFormats[currentFormatIndex]}`, quality);
         return { blob, filename };
+    };
+}
+
+async function saveViaDirectoryPicker(results) {
+    try {
+        const dirHandle = await window.showDirectoryPicker({
+            id: 'pasfoto-exports',
+            mode: 'readwrite',
+        });
+
+        for (const { blob, filename } of results) {
+            try {
+                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            } catch (error) {
+                console.error(`Error writing file ${filename}:`, error);
+                throw error;
+            }
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            return; 
+        }
+        throw error;
+    }
+}
+
+saveButton.addEventListener('click', async () => {
+    const figures = Array.from(section.querySelectorAll('figure'))
+        .filter((figure) => packRenderers[figure.dataset.pack]);
+    if (figures.length === 0) {
+        alert('No packed images to save!');
+        return;
+    }
+
+    let figureList = [...figures];
+    let usingLimitedSave = false;
+
+    
+    if (figureList.length > maxDirectDownloads && !supportsDirectoryPicker) {
+        alert(`Direct browser downloads are limited to ${maxDirectDownloads} files. Only the first ${maxDirectDownloads} images will be saved.`);
+        figureList = figureList.slice(0, maxDirectDownloads);
+        usingLimitedSave = true;
+    }
+
+    const packCounts = {};
+    figureList.forEach((figure) => {
+        const pack = figure.dataset.pack;
+        packCounts[pack] = (packCounts[pack] || 0) + 1;
     });
+
+    const packIndices = {};
+    const jobs = figureList.map((figure) => createExportJob(figure, packCounts, packIndices));
 
     try {
         const results = [];
         for (const job of jobs) {
             results.push(await job());
         }
-        results.forEach(({ blob, filename }) => {
-            downloadBlob(blob, filename);
-        });
+
+        
+        if (figureList.length <= maxDirectDownloads) {
+            
+            results.forEach(({ blob, filename }) => {
+                downloadBlob(blob, filename);
+            });
+        } else if (supportsDirectoryPicker) {
+            
+            await saveViaDirectoryPicker(results);
+        }
+        
     } catch (error) {
         console.error('Error exporting images:', error);
         alert('Error while exporting images. Please try again.');
