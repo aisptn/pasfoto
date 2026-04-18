@@ -586,7 +586,7 @@ section.addEventListener('pointercancel', endDrag);
 });
 
 let currentFormatIndex = 0;
-let quality = 1;
+let quality = 0.9;
 
 const updateQualityButtonState = () => {
     qualityButton.disabled = writeFormats[currentFormatIndex] === 'png';
