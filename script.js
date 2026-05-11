@@ -22,8 +22,7 @@ const clearButton = document.getElementById('clear');
 const formatButton = document.getElementById('format');
 const qualityButton = document.getElementById('quality');
 
-const supportsDirectoryPicker = typeof window.showDirectoryPicker === 'function';
-const maxDirectDownloads = 10;
+
 
 let figureCount = 0;
 
@@ -172,17 +171,11 @@ function addControls(figure, currentIndex) {
 function handleFiles(files) {
     const currentFigureCount = section.querySelectorAll('figure').length;
     
-    if (!supportsDirectoryPicker && currentFigureCount >= maxDirectDownloads) {
-        alert(`Maximum ${maxDirectDownloads} images allowed (File System API not available). Clear some to add more.`);
-        return;
-    }
+
 
     for (const file of files) {
         const currentCount = section.querySelectorAll('figure').length;
-        if (!supportsDirectoryPicker && currentCount >= maxDirectDownloads) {
-            alert(`Cannot add more than ${maxDirectDownloads} images.`);
-            break;
-        }
+
 
         const objectUrl = URL.createObjectURL(file);
         const img = new Image();
@@ -682,31 +675,7 @@ function createExportJob(figure, packCounts, packIndices) {
     };
 }
 
-async function saveViaDirectoryPicker(results) {
-    try {
-        const dirHandle = await window.showDirectoryPicker({
-            id: 'pasfoto-exports',
-            mode: 'readwrite',
-        });
 
-        for (const { blob, filename } of results) {
-            try {
-                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-            } catch (error) {
-                console.error(`Error writing file ${filename}:`, error);
-                throw error;
-            }
-        }
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            return; 
-        }
-        throw error;
-    }
-}
 
 saveButton.addEventListener('click', async () => {
     const figures = Array.from(section.querySelectorAll('figure'))
@@ -716,42 +685,21 @@ saveButton.addEventListener('click', async () => {
         return;
     }
 
-    let figureList = [...figures];
-    let usingLimitedSave = false;
-
-    
-    if (figureList.length > maxDirectDownloads && !supportsDirectoryPicker) {
-        alert(`Direct browser downloads are limited to ${maxDirectDownloads} files. Only the first ${maxDirectDownloads} images will be saved.`);
-        figureList = figureList.slice(0, maxDirectDownloads);
-        usingLimitedSave = true;
-    }
-
     const packCounts = {};
-    figureList.forEach((figure) => {
+    figures.forEach((figure) => {
         const pack = figure.dataset.pack;
         packCounts[pack] = (packCounts[pack] || 0) + 1;
     });
 
     const packIndices = {};
-    const jobs = figureList.map((figure) => createExportJob(figure, packCounts, packIndices));
+    const jobs = figures.map((figure) => createExportJob(figure, packCounts, packIndices));
 
     try {
-        const results = [];
         for (const job of jobs) {
-            results.push(await job());
+            const { blob, filename } = await job();
+            downloadBlob(blob, filename);
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
-
-        
-        if (figureList.length <= maxDirectDownloads) {
-            
-            results.forEach(({ blob, filename }) => {
-                downloadBlob(blob, filename);
-            });
-        } else if (supportsDirectoryPicker) {
-            
-            await saveViaDirectoryPicker(results);
-        }
-        
     } catch (error) {
         console.error('Error exporting images:', error);
         alert('Error while exporting images. Please try again.');
